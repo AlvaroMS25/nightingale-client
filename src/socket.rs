@@ -2,7 +2,8 @@ use std::{pin::Pin, task::{Context, Poll}};
 
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, tungstenite::{handshake::client::Request, Error, Message}, MaybeTlsStream, WebSocketStream};
-use futures::{Stream, ready};
+use futures::{ready, Stream, StreamExt};
+use tracing::warn;
 
 use crate::{error::SocketError, model::gateway::IncomingPayload};
 
@@ -24,7 +25,7 @@ impl Socket {
         self.stream.is_some()
     }
 
-    pub async fn connect(&mut self, url: String) -> Result<(), Error>{
+    pub async fn connect(&mut self, url: String) -> Result<(), SocketError>{
         let req = Request::builder()
             .method("GET")
             .uri(url)
@@ -32,7 +33,7 @@ impl Socket {
             .body(())
             .unwrap();
 
-        let (connection, _) = connect_async(req).await?;
+        let (connection, _) = connect_async(req).await.map_err(SocketError::Tungstenite)?;
 
         self.stream = Some(connection);
 
@@ -44,11 +45,16 @@ impl Stream for Socket {
     type Item = Result<IncomingPayload, SocketError>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let Some(socket) = self.get_mut().stream.as_mut() else { return Poll::Ready(None) };
+        let this = self.get_mut();
+        let Some(socket) = this.stream.as_mut() else { return Poll::Ready(None) };
 
         let msg = match ready!(Pin::new(socket).poll_next(cx)) {
             None => return Poll::Ready(None),
-            Some(Err(e)) => return Poll::Ready(Some(Err(From::from(e)))),
+            Some(Err(e)) => {
+                warn!("Disconnected from server, error: {e}");
+                this.stream = None;
+                return Poll::Ready(Some(Err(From::from(e))));
+            },
             Some(Ok(msg)) => msg
         };
 
