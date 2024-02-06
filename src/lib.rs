@@ -1,18 +1,20 @@
 pub mod model;
+pub mod config;
 mod error;
 mod socket;
 
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+use reqwest::Client;
+use socket::Socket;
+use config::Config;
+
+pub struct NightingaleClient {
+    socket: Socket,
+    http: Client,
+    config: Config
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl NightingaleClient {
+    pub fn new(config: Config) -> Self {
+        todo!()
     }
 }
