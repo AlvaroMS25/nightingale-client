@@ -1,3 +1,7 @@
+pub mod model;
+mod error;
+mod socket;
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
