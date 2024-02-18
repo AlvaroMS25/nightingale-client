@@ -1,7 +1,18 @@
-pub(crate) enum ToSocketMessage {
+use serde_json::Value;
+use crate::config::Config;
 
+pub(crate) enum ToSocketMessage {
+    Connect,
+    Disconnect,
+    Reconnect,
+    Resume,
+    UpdateConfig(Config),
+    Send(Value),
+    Kill
 }
 
 pub(crate) enum FromSocketMessage {
-    
+    ConnectedSuccessfully,
+    FailedToConnect(tokio_tungstenite::tungstenite::Error),
+    FailedToResume,
 }
