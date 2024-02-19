@@ -6,7 +6,6 @@ pub(crate) enum ToSocketMessage {
     Disconnect,
     Reconnect,
     Resume,
-    UpdateConfig(Config),
     Send(Value),
     Kill
 }

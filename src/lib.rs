@@ -20,32 +20,35 @@ use crate::manager::PlayerManager;
 use crate::rest::RestClient;
 use crate::socket::SocketHandle;
 
+pub(crate) struct Shared {
+    pub players: PlayerManager,
+    pub session: RwLock<Uuid>,
+    pub config: RwLock<Config>
+}
+
 pub struct NightingaleClient {
     socket: SocketHandle,
     http: RestClient,
-    config: Config,
-    session: Arc<RwLock<Uuid>>,
-    players: Arc<PlayerManager>
+    shared: Arc<Shared>
 }
 
 impl NightingaleClient {
     #[cfg(feature = "serenity")]
     pub fn new_serenity(config: Config, handler: impl EventHandler + 'static) -> Self {
-        let session = Arc::new(RwLock::new(Uuid::nil()));
-        let manager = Arc::new(PlayerManager::new());
         let events = Arc::new(handler) as Arc<dyn EventHandler>;
+        let shared = Arc::new(Shared {
+            players: PlayerManager::new(),
+            session: RwLock::new(Uuid::nil()),
+            config: RwLock::new(config)
+        });
 
         Self {
             socket: Socket::new(
-                config.clone(),
-                session.clone(),
-                manager.clone(),
+                Arc::clone(&shared),
                 events
             ),
-            http: RestClient::new(session.clone()),
-            config,
-            session,
-            players: manager
+            http: RestClient::new(Arc::clone(&shared)),
+            shared
         }
     }
 

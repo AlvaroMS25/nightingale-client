@@ -15,7 +15,7 @@ use serenity::gateway::ShardRunnerMessage;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
-use crate::{error::SocketError, model::gateway::IncomingPayload, PlayerManager};
+use crate::{error::SocketError, model::gateway::IncomingPayload, PlayerManager, Shared};
 use crate::config::Config;
 use crate::events::EventHandler;
 use crate::model::gateway::event::Event;
@@ -30,13 +30,10 @@ pub struct SocketHandle {
 /// A websocket client to te gateway.
 pub(crate) struct Socket {
     stream: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
-    config: Config,
-    session: Arc<RwLock<Uuid>>,
+    shared: Arc<Shared>,
     sender: UnboundedSender<FromSocketMessage>,
     #[cfg(feature = "serenity")]
     events: Arc<dyn EventHandler + 'static>,
-    #[cfg(feature = "serenity")]
-    players: Arc<PlayerManager>,
     #[cfg(feature = "serenity")]
     shards: HashMap<u64, Sender<ShardRunnerMessage>>
 }
@@ -44,20 +41,16 @@ pub(crate) struct Socket {
 impl Socket {
     #[cfg(feature = "serenity")]
     pub fn new(
-        config: Config,
-        session: Arc<RwLock<Uuid>>,
-        player_manager: Arc<PlayerManager>,
+        shared: Arc<Shared>,
         event_handler: Arc<dyn EventHandler + 'static>
     ) -> SocketHandle {
         let (tx, rx) = unbounded_channel();
         let (from_tx, from_rx) = unbounded_channel();
         let this = Self {
             stream: None,
-            config,
-            session,
+            shared,
             sender: from_tx,
             events: event_handler,
-            players: player_manager,
             shards: HashMap::new()
         };
 
@@ -88,13 +81,14 @@ impl Socket {
     }
 
     fn connect_uri(&self) -> String {
-        let proto = if self.config.ssl {
+        let config = self.shared.config.read();
+        let proto = if config.ssl {
             "wss://"
         } else {
             "ws://"
         };
 
-        format!("{}{}:{}/ws", proto, self.config.host, self.config.port)
+        format!("{}{}:{}/ws", proto, config.host, config.port)
     }
 
     fn sender_send(&mut self, msg: FromSocketMessage) {
@@ -105,20 +99,23 @@ impl Socket {
         match msg {
             ToSocketMessage::Connect | ToSocketMessage::Reconnect => {
                 self.try_disconnect().await;
+                let config = self.shared.config.read();
 
                 let url = format!(
                     "{}?shards={}&user_id={}",
                     self.connect_uri(),
-                    self.config.shards,
-                    self.config.user_id
+                    config.shards,
+                    config.user_id
                 );
+
+                drop(config);
 
                 self.try_connect(url).await;
             }
             ToSocketMessage::Disconnect => self.try_disconnect().await,
             ToSocketMessage::Resume => {
                 self.try_disconnect().await;
-                let session = *self.session.read();
+                let session = *self.shared.session.read();
 
                 assert_ne!(session, Uuid::nil());
 
@@ -128,7 +125,6 @@ impl Socket {
 
                 self.try_connect(url).await;
             },
-            ToSocketMessage::UpdateConfig(c) => self.config = c,
             ToSocketMessage::Send(payload) => {
                 let Ok(serialized) = serde_json::to_string(&payload) else {
                     error!("Failed to serialize payload");
@@ -155,7 +151,8 @@ impl Socket {
     }
 
     async fn try_connect(&mut self, url: String) {
-        for i in 1..=self.config.connection_attempts {
+        let attempts = self.shared.config.read().connection_attempts;
+        for i in 1..=attempts {
             match self.connect(&url).await {
                 Ok(_) => {
                     info!("Connected to nightingale server successfully!");
@@ -166,17 +163,17 @@ impl Socket {
                     warn!(
                         "Failed to connect to nightingale server [Attempt {}/{}]",
                         i,
-                        self.config.connection_attempts
+                        attempts
                     );
 
-                    if i == self.config.connection_attempts {
+                    if i == attempts {
                         self.sender_send(FromSocketMessage::FailedToConnect(error));
                     }
                 }
             }
         }
 
-        error!("Failed to connect to nightingale server after {} attempts", self.config.connection_attempts);
+        error!("Failed to connect to nightingale server after {} attempts", attempts);
     }
 
     async fn handle_payload(&mut self, incoming: Result<IncomingPayload, SocketError>) {
@@ -203,7 +200,7 @@ impl Socket {
         let events = Arc::clone(&self.events);
         match payload {
             IncomingPayload::Ready(r) => {
-                *self.session.write() = r.session;
+                *self.shared.session.write() = r.session;
 
                 tokio::spawn(async move {
                     events.on_ready(r).await;
@@ -240,10 +237,10 @@ impl Socket {
                 shard.unbounded_send(ShardRunnerMessage::Message(Message::Text(payload))).unwrap()
             }
             IncomingPayload::Event { guild_id, event } => {
-                let manager = Arc::clone(&self.players);
+                let shared = Arc::clone(&self.shared);
 
                 tokio::spawn(async move {
-                    let player = manager.get_or_insert(guild_id);
+                    let player = shared.players.get_or_insert(guild_id);
 
                     match event {
                         Event::TrackStart(t) => events.on_track_start(&*player, t).await,
@@ -259,7 +256,7 @@ impl Socket {
         let req = Request::builder()
             .method("GET")
             .uri(url)
-            .header("Authorization", &self.config.password)
+            .header("Authorization", &*self.shared.config.read().password)
             .body(())
             .unwrap();
 
