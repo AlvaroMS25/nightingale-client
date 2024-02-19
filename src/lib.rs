@@ -48,4 +48,8 @@ impl NightingaleClient {
             players: manager
         }
     }
+
+    pub async fn connect(&mut self) {
+
+    }
 }

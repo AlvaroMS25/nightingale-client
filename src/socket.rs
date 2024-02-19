@@ -150,6 +150,8 @@ impl Socket {
             code: CloseCode::Normal,
             reason: "".into()
         })).await;
+
+        self.sender_send(FromSocketMessage::Disconnected);
     }
 
     async fn try_connect(&mut self, url: String) {
@@ -190,6 +192,7 @@ impl Socket {
                 SocketError::Tungstenite(e) => {
                     error!("Disconnected from server, error: {e}");
                     self.stream = None;
+                    self.sender_send(FromSocketMessage::Disconnected);
                 }
             }
         }

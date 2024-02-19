@@ -13,6 +13,7 @@ pub(crate) enum ToSocketMessage {
 
 pub(crate) enum FromSocketMessage {
     ConnectedSuccessfully,
+    Disconnected,
     FailedToConnect(tokio_tungstenite::tungstenite::Error),
     FailedToResume,
 }
