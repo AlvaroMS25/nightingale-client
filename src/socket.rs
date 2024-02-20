@@ -23,8 +23,8 @@ use crate::model::gateway::state::UpdateState;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 
 pub struct SocketHandle {
-    sender: UnboundedSender<ToSocketMessage>,
-    receiver: UnboundedReceiver<FromSocketMessage>
+    pub sender: UnboundedSender<ToSocketMessage>,
+    pub receiver: UnboundedReceiver<FromSocketMessage>
 }
 
 /// A websocket client to te gateway.
