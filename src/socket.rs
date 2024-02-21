@@ -35,7 +35,7 @@ pub(crate) struct Socket {
     #[cfg(feature = "serenity")]
     events: Arc<dyn EventHandler + 'static>,
     #[cfg(feature = "serenity")]
-    shards: HashMap<u64, Sender<ShardRunnerMessage>>
+    shards: HashMap<u32, Sender<ShardRunnerMessage>>
 }
 
 impl Socket {
@@ -135,6 +135,13 @@ impl Socket {
                     let _ = socket.send(Message::Text(serialized)).await;
                 }
             },
+            #[cfg(feature = "serenity")]
+            ToSocketMessage::RegisterShard(id, shard) => {
+                self.shards.insert(id, shard);
+            },
+            ToSocketMessage::DeregisterShard(id) => {
+                self.shards.remove(&id);
+            }
             _ => ()
         }
     }

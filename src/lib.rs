@@ -5,12 +5,12 @@ mod socket;
 mod player;
 mod rest;
 mod msg;
+mod manager;
 #[cfg(feature = "serenity")]
 mod events;
-mod manager;
-mod guard;
+#[cfg(feature = "serenity")]
+mod serenity_ext;
 
-use std::cell::UnsafeCell;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use tokio_tungstenite::tungstenite::Error;

@@ -1,12 +1,12 @@
 use std::num::NonZeroU64;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Config {
     pub host: String,
     pub port: u16,
     pub password: String,
     pub ssl: bool,
-    pub user_id: NonZeroU64,
-    pub shards: u64,
+    pub(crate) user_id: Option<NonZeroU64>,
+    pub(crate) shards: Option<u64>,
     pub connection_attempts: u32
 }
