@@ -10,6 +10,7 @@ mod manager;
 mod events;
 #[cfg(feature = "serenity")]
 mod serenity_ext;
+mod source;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
