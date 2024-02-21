@@ -1,18 +1,24 @@
+use std::num::NonZeroU64;
 use typemap_rev::TypeMap;
 use crate::model::track::Track;
+use crate::rest::RestClient;
 
 pub struct Player {
+    http: RestClient,
     queue: Vec<Track>,
     current: Option<Track>,
-    data: TypeMap
+    data: TypeMap,
+    guild: NonZeroU64
 }
 
 impl Player {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(http: RestClient, guild: NonZeroU64) -> Self {
         Self {
+            http,
             queue: Vec::new(),
             current: None,
-            data: TypeMap::new()
+            data: TypeMap::new(),
+            guild
         }
     }
 
@@ -27,4 +33,6 @@ impl Player {
     pub fn queue(&self) -> &Vec<Track> {
         &self.queue
     }
+
+    pub async fn play() {}
 }
