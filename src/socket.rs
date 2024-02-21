@@ -31,6 +31,7 @@ pub struct SocketHandle {
 pub(crate) struct Socket {
     stream: Option<WebSocketStream<MaybeTlsStream<TcpStream>>>,
     shared: Arc<Shared>,
+    players: Arc<PlayerManager>,
     sender: UnboundedSender<FromSocketMessage>,
     #[cfg(feature = "serenity")]
     events: Arc<dyn EventHandler + 'static>,
@@ -42,6 +43,7 @@ impl Socket {
     #[cfg(feature = "serenity")]
     pub fn new(
         shared: Arc<Shared>,
+        players: Arc<PlayerManager>,
         event_handler: Arc<dyn EventHandler + 'static>
     ) -> SocketHandle {
         let (tx, rx) = unbounded_channel();
@@ -49,12 +51,15 @@ impl Socket {
         let this = Self {
             stream: None,
             shared,
+            players,
             sender: from_tx,
             events: event_handler,
             shards: HashMap::new()
         };
 
-        tokio::spawn(this.run(rx));
+        tokio::spawn(async move {
+            this.run(rx).await;
+        });
 
         SocketHandle {
             sender: tx,
@@ -99,16 +104,18 @@ impl Socket {
         match msg {
             ToSocketMessage::Connect | ToSocketMessage::Reconnect => {
                 self.try_disconnect().await;
-                let config = self.shared.config.read();
 
-                let url = format!(
-                    "{}?shards={}&user_id={}",
-                    self.connect_uri(),
-                    config.shards,
-                    config.user_id
-                );
+                let url = {
+                    let config = self.shared.config.read();
 
-                drop(config);
+                    format!(
+                        "{}?shards={}&user_id={}",
+                        self.connect_uri(),
+                        config.shards.unwrap(),
+                        config.user_id.unwrap()
+                    )
+                };
+
 
                 self.try_connect(url).await;
             }
@@ -231,7 +238,7 @@ impl Socket {
                 }
             },
             IncomingPayload::Forward(forward) => {
-                let Some(shard) = self.shards.get(&forward.shard) else {
+                let Some(shard) = self.shards.get(&(forward.shard as u32)) else {
                     error!("Shard {} not found", forward.shard);
                     return;
                 };
@@ -244,10 +251,10 @@ impl Socket {
                 shard.unbounded_send(ShardRunnerMessage::Message(Message::Text(payload))).unwrap()
             }
             IncomingPayload::Event { guild_id, event } => {
-                let shared = Arc::clone(&self.shared);
+                let players = Arc::clone(&self.players);
 
                 tokio::spawn(async move {
-                    let player = shared.players.get_or_insert(guild_id);
+                    let player = players.get_or_insert(guild_id);
 
                     match event {
                         Event::TrackStart(t) => events.on_track_start(&*player, t).await,

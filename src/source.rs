@@ -1,3 +1,4 @@
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use crate::model::search::youtube::{YoutubePlaylist, YoutubeTrack};
@@ -8,8 +9,8 @@ pub trait SearchRoute {
 }
 
 pub trait SearchSource: SearchRoute {
-    type Track: Deserialize;
-    type Playlist: Deserialize;
+    type Track: DeserializeOwned;
+    type Playlist: DeserializeOwned;
 }
 
 pub struct Youtube;
@@ -46,7 +47,7 @@ impl PlaySource for Link {
 
 pub struct Bytes(pub Vec<u8>);
 
-impl PlaySource for Link {
+impl PlaySource for Bytes {
     fn value_for(self) -> Value {
         json!({
             "type": "bytes",

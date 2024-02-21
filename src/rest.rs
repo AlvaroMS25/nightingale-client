@@ -5,7 +5,7 @@ use reqwest::{Error, Client, Response};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use uuid::Uuid;
-use crate::error::HttpError;
+use crate::error::{HttpError, StatusCodeError};
 use crate::model::error::ErrorResponse;
 use crate::model::info::Info;
 use crate::model::player::PlayerInfo;
@@ -51,7 +51,7 @@ impl RestClient {
         S: SearchSource
     {
         let _ = source;
-        deserialize_json(
+        deserialize_json::<S::Track>(
             self.http.get(format!("{}{}", self.base_route(), S::track(query)))
                 .send()
                 .await?
@@ -63,7 +63,7 @@ impl RestClient {
         S: SearchSource
     {
         let _ = source;
-        deserialize_json(
+        deserialize_json::<S::Playlist>(
             self.http.get(format!("{}/search{}", self.base_route(), S::playlist(playlist)))
                 .send()
                 .await?
@@ -78,7 +78,7 @@ impl RestClient {
         if res.status().is_success() {
             res.json().await.map_err(From::from)
         } else {
-            Err(HttpError::UnexpectedStatus(res.status()))
+            Err(HttpError::UnexpectedStatus(StatusCodeError(res.status())))
         }
     }
 
@@ -91,9 +91,10 @@ impl RestClient {
         if res.status().is_success() {
             Ok(())
         } else {
-            res.json::<ErrorResponse>()
+            Err(res.json::<ErrorResponse>()
                 .await
-                .map_err(From::from)
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
         }
     }
 
@@ -108,9 +109,10 @@ impl RestClient {
         if res.status().is_success() {
             Ok(())
         } else {
-            res.json::<ErrorResponse>()
+            Err(res.json::<ErrorResponse>()
                 .await
-                .map_err(From::from)
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
         }
     }
 
@@ -139,7 +141,7 @@ impl RestClient {
 
         let url = format!("{}/{session}/players/{guild}/play", self.base_api_route());
 
-        deserialize_json(self.http.post(url).json(&body).send().await?)
+        deserialize_json(self.http.post(url).json(&body).send().await?).await
     }
 
     pub(crate) async fn player_pause(&self, guild: NonZeroU64) -> Result<(), HttpError>
@@ -151,9 +153,10 @@ impl RestClient {
         if res.status().is_success() {
             Ok(())
         } else {
-            res.json::<ErrorResponse>()
+            Err(res.json::<ErrorResponse>()
                 .await
-                .map_err(From::from)
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
         }
     }
 
@@ -166,9 +169,10 @@ impl RestClient {
         if res.status().is_success() {
             Ok(())
         } else {
-            res.json::<ErrorResponse>()
+            Err(res.json::<ErrorResponse>()
                 .await
-                .map_err(From::from)
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
         }
     }
 
@@ -185,9 +189,10 @@ impl RestClient {
         if res.status().is_success() {
             Ok(())
         } else {
-            res.json::<ErrorResponse>()
+            Err(res.json::<ErrorResponse>()
                 .await
-                .map_err(From::from)
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
         }
     }
 
@@ -199,6 +204,6 @@ async fn deserialize_json<M: DeserializeOwned>(response: Response) -> Result<M, 
     } else {
         Err(response.json::<ErrorResponse>().await
             .map(HttpError::ErrorMessage)
-            .unwrap_or_else(HttpError::Reqwest))
+            .unwrap_or_else(From::from))
     }
 }

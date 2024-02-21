@@ -35,7 +35,7 @@ impl SerenityExt for ClientBuilder {
     ) -> Self {
         let this = Arc::new(NightingaleClient::new_serenity(config, event_handler));
 
-        self.register_from_instance(this)
+        self.register_nightingale_from_instance(this)
     }
 
     fn register_nightingale_from_instance(self, instance: Arc<NightingaleClient>) -> Self {

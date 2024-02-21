@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Track {
     pub track: Option<String>,
     pub artist: Option<String>,
