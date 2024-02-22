@@ -94,6 +94,10 @@ impl NightingaleClient {
         }
     }
 
+    pub fn rest(&self) -> &RestClient {
+        &self.http
+    }
+
     async fn connect_reconnect_inner(&mut self, p: ToSocketMessage) -> Result<(), Error> {
         self.socket.sender.send(p).unwrap();
         while let Some(msg) = self.socket.receiver.recv().await {
