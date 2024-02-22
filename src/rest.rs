@@ -58,7 +58,7 @@ impl RestClient {
     {
         let _ = source;
         deserialize_json::<Vec<S::Track>>(
-            self.http.get(format!("{}{}", self.base_route(), S::track(query)))
+            self.http.get(format!("{}/search{}", self.base_api_route(), S::track(query)))
                 .send()
                 .await?
         ).await
@@ -70,7 +70,7 @@ impl RestClient {
     {
         let _ = source;
         deserialize_json::<S::Playlist>(
-            self.http.get(format!("{}/search{}", self.base_route(), S::playlist(playlist)))
+            self.http.get(format!("{}/search{}", self.base_api_route(), S::playlist(playlist)))
                 .send()
                 .await?
         ).await
