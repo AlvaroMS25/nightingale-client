@@ -41,7 +41,7 @@ impl Player {
         &self.queue
     }
 
-    pub async fn info(&mut self) -> Result<PlayerInfo, HttpError> {
+    pub async fn info(&self) -> Result<PlayerInfo, HttpError> {
         self.http.player_info(self.guild).await
     }
 
@@ -63,6 +63,10 @@ impl Player {
             Ok(())
         } else {
             self.http.player_pause(self.guild).await
+                .map(|p| {
+                    self.paused = false;
+                    p
+                })
         }
     }
 
@@ -71,6 +75,10 @@ impl Player {
             Ok(())
         } else {
             self.http.player_resume(self.guild).await
+                .map(|p| {
+                    self.paused = false;
+                    p
+                })
         }
     }
 
