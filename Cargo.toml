@@ -24,6 +24,7 @@ tracing = "0.1.40"
 typemap_rev = "0.3.0"
 dashmap = "5.5.3"
 parking_lot = "0.12.1"
+urlencoding = "2.1.3"
 
 [features]
 twilight = ["dep:twilight-model", "dep:twilight-gateway"]
