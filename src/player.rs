@@ -64,7 +64,7 @@ impl Player {
         } else {
             self.http.player_pause(self.guild).await
                 .map(|p| {
-                    self.paused = false;
+                    self.paused = true;
                     p
                 })
         }
