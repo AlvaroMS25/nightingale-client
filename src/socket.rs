@@ -11,6 +11,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender, UnboundedReceiver};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 use futures::channel::mpsc::UnboundedSender as Sender;
+use reqwest::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use crate::{error::SocketError, model::gateway::IncomingPayload, PlayerManager, Shared};
@@ -25,6 +26,8 @@ use crate::events::EventHandler;
 use crate::model::gateway::event::Event;
 #[cfg(feature = "serenity")]
 use serenity::gateway::ShardRunnerMessage;
+use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::HeaderValue;
 #[cfg(feature = "twilight")]
 use twilight_gateway::MessageSender;
 #[cfg(feature = "twilight")]
@@ -158,6 +161,8 @@ impl Socket {
                         config.user_id.unwrap()
                     )
                 };
+
+                println!("URL: {url}");
 
 
                 self.try_connect(url).await;
@@ -309,6 +314,7 @@ impl Socket {
         }
     }
 
+    #[cfg(feature = "twilight")]
     fn handle_payload_inner(&mut self, payload: IncomingPayload) {
         let p = match payload {
             IncomingPayload::Ready(r) => {
@@ -333,15 +339,17 @@ impl Socket {
             },
             other => other.into()
         };
+
+        let _ = self.events.send(p).unwrap();
     }
 
     async fn connect(&mut self, url: &str) -> Result<(), Error>{
-        let req = Request::builder()
-            .method("GET")
-            .uri(url)
-            .header("Authorization", &*self.shared.config.read().password)
-            .body(())
-            .unwrap();
+        let mut req = url.into_client_request().unwrap();
+
+        req.headers_mut().insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(self.shared.config.read().password.clone().as_str()).unwrap()
+        );
 
         let (connection, _) = connect_async(req).await?;
 

@@ -2,6 +2,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use reqwest::{Error, Client, Response};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::de::DeserializeOwned;
 use serde_json::json;
 use uuid::Uuid;
@@ -21,9 +22,14 @@ pub struct RestClient {
 
 impl RestClient {
     pub(crate) fn new(shared: Arc<Shared>) -> Self {
+        let pass = shared.config.read().password.clone();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, HeaderValue::from_str(&pass).expect("Invalid password"));
+
         Self {
             shared,
-            http: Client::new()
+            http: Client::builder().default_headers(headers).build().unwrap()
         }
     }
 
