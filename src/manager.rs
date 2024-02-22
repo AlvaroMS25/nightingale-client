@@ -6,7 +6,7 @@ use crate::rest::RestClient;
 
 pub(crate) struct PlayerManager {
     http: RestClient,
-    players: DashMap<u64, Player>
+    pub(crate) players: DashMap<u64, Player>
 }
 
 impl PlayerManager {
