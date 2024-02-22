@@ -73,7 +73,7 @@ impl NightingaleClient {
     }
 
     #[cfg(feature = "twilight")]
-    pub fn new_twilight<'a, I>(&self, config: Config, shards: I) -> Self
+    pub fn new_twilight<'a, I>(config: Config, shards: I) -> Self
     where
         I: IntoIterator<Item = &'a Shard>
     {
