@@ -17,11 +17,11 @@ pub struct Youtube;
 
 impl SearchRoute for Youtube {
     fn track(query: String) -> String {
-        format!("/youtube/search?query={query}")
+        format!("/youtube/search?query={}", urlencoding::encode(&query))
     }
 
     fn playlist(playlist: String) -> String {
-        format!("/youtube/playlist?playlist_id={playlist}")
+        format!("/youtube/playlist?playlist_id={}", urlencoding::encode(&playlist))
     }
 }
 
