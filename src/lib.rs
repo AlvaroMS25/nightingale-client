@@ -1,13 +1,13 @@
 pub mod model;
 pub mod config;
-mod error;
+pub mod error;
 mod socket;
-mod player;
-mod rest;
+pub mod player;
+pub mod rest;
 mod msg;
 mod manager;
-mod source;
-mod events;
+pub mod source;
+pub mod events;
 #[cfg(feature = "serenity")]
 mod serenity_ext;
 
@@ -15,13 +15,16 @@ mod serenity_ext;
 mod stream;
 
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::sync::Arc;
+use dashmap::mapref::one::{Ref, RefMut};
 use parking_lot::RwLock;
 use tokio_tungstenite::tungstenite::Error;
 use twilight_gateway::Shard;
 use uuid::Uuid;
 use socket::Socket;
 use config::Config;
+use crate::error::HttpError;
 use crate::manager::PlayerManager;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 use crate::rest::RestClient;
@@ -29,6 +32,9 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
+use crate::player::Player;
+use crate::source::SearchSource;
+#[cfg(feature = "twilight")]
 use crate::stream::EventStream;
 
 pub(crate) struct Shared {
@@ -126,5 +132,41 @@ impl NightingaleClient {
 
     pub fn events(&self) -> Option<EventStream> {
         EventStream::new(&self.socket.events)
+    }
+
+    pub async fn join<G, C>(&self, guild: G, channel: C)
+        -> Result<(), HttpError>
+    where
+        G: Into<NonZeroU64>,
+        C: Into<NonZeroU64>
+    {
+        self.http.connect(guild.into(), channel.into()).await
+    }
+
+    pub async fn leave<G: Into<NonZeroU64>>(&self, guild: G)
+        -> Result<(), HttpError> {
+        self.http.disconnect(guild.into()).await
+    }
+
+    pub async fn search<S>(&self, query: String, source: S) -> Result<S::Track, HttpError>
+    where
+        S: SearchSource
+    {
+        self.http.search(query, source).await
+    }
+
+    pub async fn playlist<S>(&self, playlist: String, source: S) -> Result<S::Playlist, HttpError>
+    where
+        S: SearchSource
+    {
+        self.http.playlist(playlist, source).await
+    }
+
+    pub fn get_player(&self, guild: impl Into<NonZeroU64>) -> Option<Ref<u64, Player>> {
+        self.players.players.get(&guild.into().get())
+    }
+
+    pub fn get_player_mut(&self, guild: impl Into<NonZeroU64>) -> Option<RefMut<u64, Player>> {
+        self.players.players.get_mut(&guild.into().get())
     }
 }
