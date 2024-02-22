@@ -18,11 +18,13 @@ use tokio_tungstenite::tungstenite::Error;
 use uuid::Uuid;
 use socket::Socket;
 use config::Config;
-use crate::events::EventHandler;
 use crate::manager::PlayerManager;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 use crate::rest::RestClient;
 use crate::socket::SocketHandle;
+
+#[cfg(feature = "serenity")]
+use crate::events::EventHandler;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,

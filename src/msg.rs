@@ -1,7 +1,8 @@
 use futures::channel::mpsc::UnboundedSender;
 use serde_json::Value;
+
+#[cfg(feature = "serenity")]
 use serenity::all::ShardRunnerMessage;
-use crate::config::Config;
 
 pub(crate) enum ToSocketMessage {
     Connect,
@@ -11,6 +12,7 @@ pub(crate) enum ToSocketMessage {
     Send(Value),
     #[cfg(feature = "serenity")]
     RegisterShard(u32, UnboundedSender<ShardRunnerMessage>),
+    #[cfg(feature = "serenity")]
     DeregisterShard(u32),
     Kill
 }

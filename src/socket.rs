@@ -11,16 +11,20 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender, UnboundedReceiver};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 use futures::channel::mpsc::UnboundedSender as Sender;
-use serenity::gateway::ShardRunnerMessage;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
-
 use crate::{error::SocketError, model::gateway::IncomingPayload, PlayerManager, Shared};
+
 use crate::config::Config;
-use crate::events::EventHandler;
-use crate::model::gateway::event::Event;
 use crate::model::gateway::state::UpdateState;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
+
+#[cfg(feature = "serenity")]
+use crate::events::EventHandler;
+#[cfg(feature = "serenity")]
+use crate::model::gateway::event::Event;
+#[cfg(feature = "serenity")]
+use serenity::gateway::ShardRunnerMessage;
 
 pub struct SocketHandle {
     pub sender: UnboundedSender<ToSocketMessage>,
@@ -146,6 +150,7 @@ impl Socket {
             ToSocketMessage::RegisterShard(id, shard) => {
                 self.shards.insert(id, shard);
             },
+            #[cfg(feature = "serenity")]
             ToSocketMessage::DeregisterShard(id) => {
                 self.shards.remove(&id);
             }
