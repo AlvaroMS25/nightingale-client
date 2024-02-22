@@ -46,12 +46,12 @@ impl RestClient {
         *self.shared.session.read()
     }
 
-    pub async fn search<S>(&self, query: String, source: S) -> Result<S::Track, HttpError>
+    pub async fn search<S>(&self, query: String, source: S) -> Result<Vec<S::Track>, HttpError>
     where
         S: SearchSource
     {
         let _ = source;
-        deserialize_json::<S::Track>(
+        deserialize_json::<Vec<S::Track>>(
             self.http.get(format!("{}{}", self.base_route(), S::track(query)))
                 .send()
                 .await?

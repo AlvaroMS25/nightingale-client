@@ -130,6 +130,7 @@ impl NightingaleClient {
         self.connect_reconnect_inner(ToSocketMessage::Reconnect).await
     }
 
+    #[cfg(feature = "twilight")]
     pub fn events(&self) -> Option<EventStream> {
         EventStream::new(&self.socket.events)
     }
@@ -148,7 +149,7 @@ impl NightingaleClient {
         self.http.disconnect(guild.into()).await
     }
 
-    pub async fn search<S>(&self, query: String, source: S) -> Result<S::Track, HttpError>
+    pub async fn search<S>(&self, query: String, source: S) -> Result<Vec<S::Track>, HttpError>
     where
         S: SearchSource
     {
