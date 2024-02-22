@@ -6,7 +6,7 @@ pub struct Config {
     pub port: u16,
     pub password: String,
     pub ssl: bool,
-    pub(crate) user_id: Option<NonZeroU64>,
-    pub(crate) shards: Option<u64>,
+    pub user_id: Option<NonZeroU64>,
+    pub shards: Option<u64>,
     pub connection_attempts: u32
 }
