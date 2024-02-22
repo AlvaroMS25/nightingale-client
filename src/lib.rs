@@ -6,15 +6,19 @@ mod player;
 mod rest;
 mod msg;
 mod manager;
-#[cfg(feature = "serenity")]
+mod source;
 mod events;
 #[cfg(feature = "serenity")]
 mod serenity_ext;
-mod source;
 
+#[cfg(feature = "twilight")]
+mod stream;
+
+use std::collections::HashMap;
 use std::sync::Arc;
 use parking_lot::RwLock;
 use tokio_tungstenite::tungstenite::Error;
+use twilight_gateway::Shard;
 use uuid::Uuid;
 use socket::Socket;
 use config::Config;
@@ -25,6 +29,7 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
+use crate::stream::EventStream;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,
@@ -61,6 +66,34 @@ impl NightingaleClient {
         }
     }
 
+    #[cfg(feature = "twilight")]
+    pub fn new_twilight<'a, I>(&self, config: Config, shards: I) -> Self
+    where
+        I: IntoIterator<Item = &'a Shard>
+    {
+        let map = shards.into_iter().map(|s| (s.id().number(), s.sender()))
+            .collect::<HashMap<_, _>>();
+
+        let shared = Arc::new(Shared {
+            session: RwLock::new(Uuid::nil()),
+            config: RwLock::new(config)
+        });
+
+        let rest = RestClient::new(shared.clone());
+        let players = Arc::new(PlayerManager::new(rest.clone()));
+
+        Self {
+            socket: Socket::new(
+                shared.clone(),
+                players.clone(),
+                map
+            ),
+            http: rest,
+            shared,
+            players
+        }
+    }
+
     async fn connect_reconnect_inner(&mut self, p: ToSocketMessage) -> Result<(), Error> {
         self.socket.sender.send(p).unwrap();
         while let Some(msg) = self.socket.receiver.recv().await {
@@ -85,5 +118,9 @@ impl NightingaleClient {
 
     pub async fn reconnect(&mut self) -> Result<(), Error> {
         self.connect_reconnect_inner(ToSocketMessage::Reconnect).await
+    }
+
+    pub fn events(&self) -> Option<EventStream> {
+        EventStream::new(&self.socket.events)
     }
 }

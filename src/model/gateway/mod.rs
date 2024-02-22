@@ -9,7 +9,7 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 #[serde(tag = "op", content = "data")]
 #[serde(rename_all = "snake_case")]
-pub enum IncomingPayload {
+pub(crate) enum IncomingPayload {
     Ready(ready::Ready),
     Forward(forward::Forward),
     UpdateState(state::UpdateState),

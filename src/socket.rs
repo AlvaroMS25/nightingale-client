@@ -3,7 +3,7 @@ use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::Arc;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{connect_async, tungstenite::{handshake::client::Request, Error, Message}, MaybeTlsStream, WebSocketStream};
 use futures::{ready, SinkExt, Stream, StreamExt};
@@ -25,10 +25,16 @@ use crate::events::EventHandler;
 use crate::model::gateway::event::Event;
 #[cfg(feature = "serenity")]
 use serenity::gateway::ShardRunnerMessage;
+#[cfg(feature = "twilight")]
+use twilight_gateway::MessageSender;
+#[cfg(feature = "twilight")]
+use crate::events::IncomingEvent;
 
 pub struct SocketHandle {
     pub sender: UnboundedSender<ToSocketMessage>,
-    pub receiver: UnboundedReceiver<FromSocketMessage>
+    pub receiver: UnboundedReceiver<FromSocketMessage>,
+    #[cfg(feature = "twilight")]
+    pub events: Mutex<Option<UnboundedReceiver<IncomingEvent>>>,
 }
 
 /// A websocket client to te gateway.
@@ -40,7 +46,11 @@ pub(crate) struct Socket {
     #[cfg(feature = "serenity")]
     events: Arc<dyn EventHandler + 'static>,
     #[cfg(feature = "serenity")]
-    shards: HashMap<u32, Sender<ShardRunnerMessage>>
+    shards: HashMap<u32, Sender<ShardRunnerMessage>>,
+    #[cfg(feature = "twilight")]
+    shards: HashMap<u64, MessageSender>,
+    #[cfg(feature = "twilight")]
+    events: UnboundedSender<IncomingEvent>
 }
 
 impl Socket {
@@ -71,6 +81,35 @@ impl Socket {
         }
     }
 
+    pub fn new(
+        shared: Arc<Shared>,
+        players: Arc<PlayerManager>,
+        shards: HashMap<u64, MessageSender>
+    ) -> SocketHandle {
+        let (to_tx, to_rx) = unbounded_channel();
+        let (from_tx, from_rx) = unbounded_channel();
+        let (events_tx, events_rx) = unbounded_channel();
+
+        let this = Self {
+            stream: None,
+            shared,
+            players,
+            sender: from_tx,
+            shards,
+            events: events_tx
+        };
+
+        tokio::spawn(async move {
+            this.run(to_rx).await;
+        });
+
+        SocketHandle {
+            sender: to_tx,
+            receiver: from_rx,
+            events: Mutex::new(Some(events_rx))
+        }
+    }
+
     async fn run(mut self, mut receiver: UnboundedReceiver<ToSocketMessage>) {
         loop {
             tokio::select! {
@@ -84,7 +123,7 @@ impl Socket {
 
                     self.handle_msg(msg).await
                 },
-                Some(payload) = self.next() => self.handle_payload(payload).await
+                Some(payload) = self.next() => self.handle_payload(payload)
             }
         }
     }
@@ -195,11 +234,10 @@ impl Socket {
         error!("Failed to connect to nightingale server after {} attempts", attempts);
     }
 
-    async fn handle_payload(&mut self, incoming: Result<IncomingPayload, SocketError>) {
+    fn handle_payload(&mut self, incoming: Result<IncomingPayload, SocketError>) {
         match incoming {
             Ok(payload) => {
-                #[cfg(feature = "serenity")]
-                self.handle_payload_inner_serenity(payload).await;
+                self.handle_payload_inner(payload);
             },
             Err(error) => match error {
                 SocketError::Deserialize(e) => {
@@ -215,7 +253,7 @@ impl Socket {
     }
 
     #[cfg(feature = "serenity")]
-    async fn handle_payload_inner_serenity(&mut self, payload: IncomingPayload) {
+    fn handle_payload_inner(&mut self, payload: IncomingPayload) {
         let events = Arc::clone(&self.events);
         match payload {
             IncomingPayload::Ready(r) => {
@@ -269,6 +307,32 @@ impl Socket {
                 });
             }
         }
+    }
+
+    fn handle_payload_inner(&mut self, payload: IncomingPayload) {
+        let p = match payload {
+            IncomingPayload::Ready(r) => {
+                *self.shared.session.write() = r.session;
+
+                IncomingEvent::Ready(r)
+            },
+            IncomingPayload::Forward(p) => {
+                let Some(sender) = self.shards.get(&p.shard) else {
+                    error!("Shard {} not found", p.shard);
+                    return;
+                };
+
+                let Ok(payload) = serde_json::to_string(&p.payload) else {
+                    error!("Failed to serialize forward payload");
+                    return;
+                };
+
+                let _ = sender.send(payload);
+
+                return;
+            },
+            other => other.into()
+        };
     }
 
     async fn connect(&mut self, url: &str) -> Result<(), Error>{
