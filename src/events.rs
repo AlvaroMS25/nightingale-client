@@ -1,3 +1,4 @@
+use serde_json::json;
 #[cfg(feature = "serenity")]
 use crate::model::gateway::event::{TrackEnd, TrackErrored};
 #[cfg(feature = "serenity")]
@@ -9,7 +10,13 @@ use crate::player::Player;
 #[cfg(feature = "serenity")]
 use serenity::async_trait;
 #[cfg(feature = "twilight")]
+use tokio::sync::mpsc::UnboundedSender;
+#[cfg(feature = "twilight")]
 use crate::model::gateway::{ready::Ready, event::Event, state::UpdateState, IncomingPayload};
+#[cfg(feature = "twilight")]
+use crate::msg::ToSocketMessage;
+#[cfg(feature = "twilight")]
+use twilight_model::gateway::event::Event as TwilightEvent;
 
 #[cfg(feature = "serenity")]
 #[async_trait]
@@ -40,5 +47,36 @@ impl From<IncomingPayload> for IncomingEvent {
             IncomingPayload::UpdateState(s) => Self::UpdateState(s),
             IncomingPayload::Event { guild_id, event } => Self::Event { guild_id, event }
         }
+    }
+}
+
+pub struct EventForwarder {
+    pub(crate) sender: UnboundedSender<ToSocketMessage>
+}
+
+impl EventForwarder {
+    pub fn forward(&self, event: &TwilightEvent) {
+        let p = match event {
+            TwilightEvent::VoiceServerUpdate(su) => json!({
+                "op": "update_voice_server",
+                "data": {
+                    "guild_id": su.guild_id.get(),
+                    "endpoint": &su.endpoint,
+                    "token": &su.token
+                }
+            }),
+            TwilightEvent::VoiceStateUpdate(su) => json!({
+                "op": "update_voice_state",
+                "data": {
+                    "guild_id": su.guild_id.map(|g| g.get()),
+                    "user_id": su.user_id.get(),
+                    "session_id": &su.session_id,
+                    "channel_id": su.channel_id.map(|c| c.get())
+                }
+            }),
+            _ => return
+        };
+
+        self.sender.send(ToSocketMessage::Send(p)).unwrap();
     }
 }

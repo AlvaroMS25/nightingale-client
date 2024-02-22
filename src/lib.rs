@@ -25,6 +25,7 @@ use uuid::Uuid;
 use socket::Socket;
 use config::Config;
 use crate::error::HttpError;
+use crate::events::EventForwarder;
 use crate::manager::PlayerManager;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 use crate::rest::RestClient;
@@ -135,18 +136,35 @@ impl NightingaleClient {
         EventStream::new(&self.socket.events)
     }
 
+    #[cfg(feature = "twilight")]
+    pub fn events_forwarder(&self) -> EventForwarder {
+        EventForwarder {
+            sender: self.socket.sender.clone()
+        }
+    }
+
     pub async fn join<G, C>(&self, guild: G, channel: C)
         -> Result<(), HttpError>
     where
         G: Into<NonZeroU64>,
         C: Into<NonZeroU64>
     {
+        let guild = guild.into();
         self.http.connect(guild.into(), channel.into()).await
+            .map(|res| {
+                self.players.get_or_insert(guild.get());
+                res
+            })
     }
 
     pub async fn leave<G: Into<NonZeroU64>>(&self, guild: G)
         -> Result<(), HttpError> {
-        self.http.disconnect(guild.into()).await
+        let guild = guild.into();
+        self.http.disconnect(guild).await
+            .map(|res| {
+                self.players.players.remove(&guild.get());
+                res
+            })
     }
 
     pub async fn search<S>(&self, query: String, source: S) -> Result<Vec<S::Track>, HttpError>
