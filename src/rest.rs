@@ -33,7 +33,7 @@ impl RestClient {
         }
     }
 
-    fn base_route(&self) -> String {
+    fn base_api_route(&self) -> String {
         let config = self.shared.config.read();
         let schema = if config.ssl {
             "https://"
@@ -41,11 +41,7 @@ impl RestClient {
             "http://"
         };
 
-        format!("{schema}{}:{}", config.host, config.port)
-    }
-
-    fn base_api_route(&self) -> String {
-        format!("{}/api/v1", self.base_route())
+        format!("{schema}{}:{}/api/v1", config.host, config.port)
     }
 
     fn session(&self) -> Uuid {
@@ -77,7 +73,7 @@ impl RestClient {
     }
 
     pub async fn server_info(&self) -> Result<Info, HttpError> {
-        let res = self.http.get(format!("{}/info", self.base_route()))
+        let res = self.http.get(format!("{}/info", self.base_api_route()))
             .send()
             .await?;
 
