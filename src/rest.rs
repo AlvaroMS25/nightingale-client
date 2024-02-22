@@ -82,8 +82,13 @@ impl RestClient {
         }
     }
 
-    pub(crate) async fn connect(&self, session: Uuid, guild: NonZeroU64) -> Result<(), HttpError> {
-        let url = format!("{}/{session}/players/{guild}/connect", self.base_api_route());
+    pub(crate) async fn connect(&self, guild: NonZeroU64, channel: NonZeroU64) -> Result<(), HttpError> {
+        let session = self.session();
+
+        let url = format!(
+            "{}/{session}/players/{guild}/connect?channel_id={channel}",
+            self.base_api_route()
+        );
         let res = self.http.put(url)
             .send()
             .await?;
