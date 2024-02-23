@@ -20,12 +20,10 @@ use std::sync::Arc;
 use dashmap::mapref::one::{Ref, RefMut};
 use parking_lot::RwLock;
 use tokio_tungstenite::tungstenite::Error;
-use twilight_gateway::Shard;
 use uuid::Uuid;
 use socket::Socket;
 use config::Config;
 use crate::error::HttpError;
-use crate::events::EventForwarder;
 use crate::manager::PlayerManager;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 use crate::rest::RestClient;
@@ -37,6 +35,10 @@ use crate::player::Player;
 use crate::source::SearchSource;
 #[cfg(feature = "twilight")]
 use crate::stream::EventStream;
+#[cfg(feature = "twilight")]
+use crate::events::EventForwarder;
+#[cfg(feature = "twilight")]
+use twilight_gateway::Shard;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,

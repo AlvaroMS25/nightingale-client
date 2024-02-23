@@ -11,7 +11,8 @@ use typemap_rev::TypeMapKey;
 use crate::config::Config;
 use crate::events::EventHandler;
 use crate::msg::ToSocketMessage;
-use crate::NightingaleClient;
+use crate::{NightingaleClient, Shared};
+use tokio::sync::mpsc::UnboundedSender as TokioSender;
 
 pub struct NightingaleKey;
 
@@ -26,7 +27,7 @@ pub trait SerenityExt {
         config: Config,
         event_handler: impl EventHandler + 'static
     ) -> Self;
-    fn register_nightingale_from_instance(self, instance: Arc<NightingaleClient>) -> Self;
+    fn register_nightingale_from_instance(self, instance: NightingaleClient) -> Self;
 }
 
 #[async_trait]
@@ -36,19 +37,29 @@ impl SerenityExt for ClientBuilder {
         config: Config,
         event_handler: impl EventHandler + 'static
     ) -> Self {
-        let this = Arc::new(NightingaleClient::new_serenity(config, event_handler));
+        let this = NightingaleClient::new_serenity(config, event_handler);
 
         self.register_nightingale_from_instance(this)
     }
 
-    fn register_nightingale_from_instance(self, instance: Arc<NightingaleClient>) -> Self {
-        self.voice_manager_arc(instance.clone())
-            .type_map_insert::<NightingaleClient>(instance)
+    fn register_nightingale_from_instance(self, instance: NightingaleClient) -> Self {
+        let manager = NightingaleVoiceManager {
+            shared: instance.shared.clone(),
+            sender: instance.socket.sender.clone()
+        };
+
+        self.voice_manager(manager)
+            .type_map_insert::<NightingaleKey>(Arc::new(RwLock::new(instance)))
     }
 }
 
+struct NightingaleVoiceManager {
+    shared: Arc<Shared>,
+    sender: TokioSender<ToSocketMessage>
+}
+
 #[async_trait]
-impl VoiceGatewayManager for NightingaleClient {
+impl VoiceGatewayManager for NightingaleVoiceManager {
     async fn initialise(&self, shard_count: u32, user_id: UserId) {
         let mut cfg = self.shared.config.write();
 
@@ -57,11 +68,11 @@ impl VoiceGatewayManager for NightingaleClient {
     }
 
     async fn register_shard(&self, shard_id: u32, sender: UnboundedSender<ShardRunnerMessage>) {
-        self.socket.sender.send(ToSocketMessage::RegisterShard(shard_id, sender)).unwrap();
+        self.sender.send(ToSocketMessage::RegisterShard(shard_id, sender)).unwrap();
     }
 
     async fn deregister_shard(&self, shard_id: u32) {
-        self.socket.sender.send(ToSocketMessage::DeregisterShard(shard_id)).unwrap()
+        self.sender.send(ToSocketMessage::DeregisterShard(shard_id)).unwrap()
     }
 
     async fn server_update(&self, guild_id: GuildId, endpoint: &Option<String>, token: &str) {
@@ -74,7 +85,7 @@ impl VoiceGatewayManager for NightingaleClient {
             }
         });
 
-        self.socket.sender.send(ToSocketMessage::Send(value)).unwrap();
+        self.sender.send(ToSocketMessage::Send(value)).unwrap();
     }
 
     async fn state_update(&self, guild_id: GuildId, voice_state: &VoiceState) {
@@ -88,6 +99,6 @@ impl VoiceGatewayManager for NightingaleClient {
             }
         });
 
-        self.socket.sender.send(ToSocketMessage::Send(value)).unwrap();
+        self.sender.send(ToSocketMessage::Send(value)).unwrap();
     }
 }
