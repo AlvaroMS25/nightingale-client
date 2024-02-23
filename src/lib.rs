@@ -9,7 +9,7 @@ mod manager;
 pub mod source;
 pub mod events;
 #[cfg(feature = "serenity")]
-mod serenity_ext;
+pub mod serenity_ext;
 
 #[cfg(feature = "twilight")]
 mod stream;
