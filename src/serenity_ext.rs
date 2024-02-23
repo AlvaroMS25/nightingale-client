@@ -6,14 +6,17 @@ use serenity::all::{GuildId, ShardRunnerMessage, UserId, VoiceState};
 use serenity::async_trait;
 use serenity::client::ClientBuilder;
 use serenity::gateway::VoiceGatewayManager;
+use tokio::sync::RwLock;
 use typemap_rev::TypeMapKey;
 use crate::config::Config;
 use crate::events::EventHandler;
 use crate::msg::ToSocketMessage;
 use crate::NightingaleClient;
 
-impl TypeMapKey for NightingaleClient {
-    type Value = Arc<Self>;
+pub struct NightingaleKey;
+
+impl TypeMapKey for NightingaleKey {
+    type Value = Arc<RwLock<NightingaleClient>>;
 }
 
 #[async_trait]
