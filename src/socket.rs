@@ -84,6 +84,7 @@ impl Socket {
         }
     }
 
+    #[cfg(feature = "twilight")]
     pub fn new(
         shared: Arc<Shared>,
         players: Arc<PlayerManager>,

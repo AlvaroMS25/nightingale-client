@@ -1,4 +1,4 @@
-use serde_json::json;
+use crate::model::gateway::ready::Ready;
 #[cfg(feature = "serenity")]
 use crate::model::gateway::event::{TrackEnd, TrackErrored};
 #[cfg(feature = "serenity")]
@@ -12,11 +12,13 @@ use serenity::async_trait;
 #[cfg(feature = "twilight")]
 use tokio::sync::mpsc::UnboundedSender;
 #[cfg(feature = "twilight")]
-use crate::model::gateway::{ready::Ready, event::Event, state::UpdateState, IncomingPayload};
+use crate::model::gateway::{event::Event, state::UpdateState, IncomingPayload};
 #[cfg(feature = "twilight")]
 use crate::msg::ToSocketMessage;
 #[cfg(feature = "twilight")]
 use twilight_model::gateway::event::Event as TwilightEvent;
+#[cfg(feature = "twilight")]
+use serde_json::json;
 
 #[cfg(feature = "serenity")]
 #[async_trait]
@@ -30,6 +32,7 @@ pub trait EventHandler: Send + Sync {
     async fn on_track_errored(&self, _player: &Player, _track_errored: TrackErrored) {}
 }
 
+#[cfg(feature = "twilight")]
 pub enum IncomingEvent {
     Ready(Ready),
     UpdateState(UpdateState),
@@ -39,6 +42,7 @@ pub enum IncomingEvent {
     }
 }
 
+#[cfg(feature = "twilight")]
 impl From<IncomingPayload> for IncomingEvent {
     fn from(value: IncomingPayload) -> Self {
         match value {
@@ -50,10 +54,12 @@ impl From<IncomingPayload> for IncomingEvent {
     }
 }
 
+#[cfg(feature = "twilight")]
 pub struct EventForwarder {
     pub(crate) sender: UnboundedSender<ToSocketMessage>
 }
 
+#[cfg(feature = "twilight")]
 impl EventForwarder {
     pub fn forward(&self, event: &TwilightEvent) {
         let p = match event {

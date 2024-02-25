@@ -30,4 +30,4 @@ urlencoding = "2.1.3"
 twilight = ["dep:twilight-model", "dep:twilight-gateway"]
 
 __build-serenity = ["serenity", "serenity/rustls_backend"]
-default = ["twilight"]
+default = []
