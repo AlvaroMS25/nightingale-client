@@ -163,9 +163,6 @@ impl Socket {
                     )
                 };
 
-                println!("URL: {url}");
-
-
                 self.try_connect(url).await;
             }
             ToSocketMessage::Disconnect => self.try_disconnect().await,
