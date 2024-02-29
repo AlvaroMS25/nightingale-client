@@ -63,8 +63,8 @@ impl VoiceGatewayManager for NightingaleVoiceManager {
     async fn initialise(&self, shard_count: u32, user_id: UserId) {
         let mut cfg = self.shared.config.write();
 
-        cfg.shards = Some(shard_count as _);
-        cfg.user_id = Some(user_id.into());
+        cfg.shards = shard_count as _;
+        cfg.user_id = user_id.into();
     }
 
     async fn register_shard(&self, shard_id: u32, sender: UnboundedSender<ShardRunnerMessage>) {
