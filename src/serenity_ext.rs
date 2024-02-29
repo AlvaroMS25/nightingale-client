@@ -43,19 +43,14 @@ impl SerenityExt for ClientBuilder {
     }
 
     fn register_nightingale_from_instance(self, instance: NightingaleClient) -> Self {
-        let manager = NightingaleVoiceManager {
-            shared: instance.shared.clone(),
-            sender: instance.socket.sender.clone()
-        };
-
-        self.voice_manager(manager)
+        self.voice_manager_arc(instance.voice_manager())
             .type_map_insert::<NightingaleKey>(Arc::new(RwLock::new(instance)))
     }
 }
 
-struct NightingaleVoiceManager {
-    shared: Arc<Shared>,
-    sender: TokioSender<ToSocketMessage>
+pub(crate) struct NightingaleVoiceManager {
+    pub shared: Arc<Shared>,
+    pub sender: TokioSender<ToSocketMessage>
 }
 
 #[async_trait]

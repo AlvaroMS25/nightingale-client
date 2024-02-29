@@ -31,6 +31,11 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
+#[cfg(feature = "serenity")]
+use serenity::gateway::VoiceGatewayManager;
+#[cfg(feature = "serenity")]
+use crate::serenity_ext::NightingaleVoiceManager;
+
 use crate::player::Player;
 use crate::source::SearchSource;
 #[cfg(feature = "twilight")]
@@ -103,6 +108,14 @@ impl NightingaleClient {
             shared,
             players
         }
+    }
+
+    #[cfg(feature = "serenity")]
+    pub fn voice_manager(&self) -> Arc<dyn VoiceGatewayManager> {
+        Arc::new(NightingaleVoiceManager {
+            shared: self.shared.clone(),
+            sender: self.socket.sender.clone()
+        })
     }
 
     pub fn rest(&self) -> &RestClient {
