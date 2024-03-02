@@ -11,7 +11,6 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender, UnboundedReceiver};
 use tracing::{error, info, warn};
 use uuid::Uuid;
 use futures::channel::mpsc::UnboundedSender as Sender;
-use reqwest::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::protocol::CloseFrame;
 use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 use crate::{error::SocketError, model::gateway::IncomingPayload, PlayerManager, Shared};
@@ -27,6 +26,7 @@ use crate::model::gateway::event::Event;
 #[cfg(feature = "serenity")]
 use serenity::gateway::ShardRunnerMessage;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::http::header::AUTHORIZATION;
 use tokio_tungstenite::tungstenite::http::HeaderValue;
 #[cfg(feature = "twilight")]
 use twilight_gateway::MessageSender;
