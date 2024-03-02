@@ -31,6 +31,11 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
+#[cfg(feature = "serenity")]
+use serenity::gateway::VoiceGatewayManager;
+#[cfg(feature = "serenity")]
+use crate::serenity_ext::NightingaleVoiceManager;
+
 use crate::player::Player;
 use crate::source::SearchSource;
 #[cfg(feature = "twilight")]
@@ -55,6 +60,7 @@ pub struct NightingaleClient {
 impl NightingaleClient {
     #[cfg(feature = "serenity")]
     pub fn new_serenity(config: Config, handler: impl EventHandler + 'static) -> Self {
+        assert_ne!(config.user_id.get(), 1);
         let events = Arc::new(handler) as Arc<dyn EventHandler>;
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
@@ -80,6 +86,7 @@ impl NightingaleClient {
     where
         I: IntoIterator<Item = &'a Shard>
     {
+        assert_ne!(config.user_id.get(), 1);
         let map = shards.into_iter().map(|s| (s.id().number(), s.sender()))
             .collect::<HashMap<_, _>>();
 
@@ -101,6 +108,14 @@ impl NightingaleClient {
             shared,
             players
         }
+    }
+
+    #[cfg(feature = "serenity")]
+    pub fn voice_manager(&self) -> Arc<dyn VoiceGatewayManager> {
+        Arc::new(NightingaleVoiceManager {
+            shared: self.shared.clone(),
+            sender: self.socket.sender.clone()
+        })
     }
 
     pub fn rest(&self) -> &RestClient {

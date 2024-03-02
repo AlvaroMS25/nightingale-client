@@ -158,13 +158,10 @@ impl Socket {
                     format!(
                         "{}?shards={}&user_id={}",
                         self.connect_uri(),
-                        config.shards.unwrap(),
-                        config.user_id.unwrap()
+                        config.shards,
+                        config.user_id
                     )
                 };
-
-                println!("URL: {url}");
-
 
                 self.try_connect(url).await;
             }
