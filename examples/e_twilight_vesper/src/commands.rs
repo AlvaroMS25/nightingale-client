@@ -1,15 +1,18 @@
-use std::sync::Arc;
+use lazy_static::lazy_static;
 use nightingale_client::source::{Link, Youtube};
+use regex::Regex;
 use tracing::info;
 use vesper::context::SlashContext;
 use vesper::framework::DefaultError;
-use vesper::parsers::VoiceChannelId;
 use vesper::prelude::{check, command, DefaultCommandResult};
 use crate::ArcShared;
 
+lazy_static! {
+    static ref URL_REGEX: Regex = Regex::new(r"https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)").unwrap();
+}
 
-async fn send_text(cx: &SlashContext<'_, ArcShared>, content: String) -> DefaultCommandResult {
-    cx.interaction_client.update_response(&cx.interaction.token)
+async fn send_text(ctx: &SlashContext<'_, ArcShared>, content: String) -> DefaultCommandResult {
+    ctx.interaction_client.update_response(&ctx.interaction.token)
         .content(Some(&content))?
         .await?;
 
@@ -17,9 +20,9 @@ async fn send_text(cx: &SlashContext<'_, ArcShared>, content: String) -> Default
 }
 
 #[check]
-async fn player_available(cx: &SlashContext<ArcShared>) -> Result<bool, DefaultError> {
-    let p = cx.data.nightingale.read().await
-        .get_player(cx.interaction.guild_id.as_ref().unwrap().into_nonzero())
+async fn player_available(ctx: &SlashContext<ArcShared>) -> Result<bool, DefaultError> {
+    let p = ctx.data.nightingale.read().await
+        .get_player(ctx.interaction.guild_id.unwrap())
         .is_some();
     info!("Player available?: {p}");
     Ok(p)
@@ -31,46 +34,31 @@ async fn player_available(cx: &SlashContext<ArcShared>) -> Result<bool, DefaultE
 #[only_guilds]
 pub async fn play(
     ctx: &mut SlashContext<ArcShared>,
-    #[description = "Link for the song"]
-    link: Option<String>,
-    #[description = "Query to search from, will play first match"]
-    query: Option<String>
+    #[description = "Query or link to play from"]
+    source: String,
 ) -> DefaultCommandResult {
-    let mut link = link;
-    let mut query = query;
     ctx.defer(false).await?;
 
-    if link.is_none() && query.is_none() {
-        send_text(ctx, "No input provided".to_string()).await?;
-        return Ok(())
-    }
+    let client = ctx.data.nightingale.read().await;
 
-    if link.is_some() && query.is_some() {
-        query.take();
-    }
+    let src = if URL_REGEX.is_match(&source) {
+        source
+    } else {
+        let mut results = client.search(source.clone(), Youtube).await?;
 
-    let read = ctx.data.nightingale.read().await;
-
-    if query.is_some() {
-        info!("Searching on youtube...");
-        send_text(ctx, "Searching on youtube and playing...".to_string()).await?;
-        let mut tracks = read.search(query.unwrap(), Youtube).await?;
-
-        if tracks.len() == 0 {
-            send_text(ctx, "No results found".to_string()).await?;
+        if results.is_empty() {
+            send_text(ctx, format!("No results were found for query: {source}")).await?;
             return Ok(());
         }
 
-        let first = tracks.remove(0);
-        info!("First: {}", first.title);
+        results.remove(0).url
+    };
 
-        link = Some(tracks.remove(0).url);
-    }
-
-    let mut p = read.get_player_mut(ctx.interaction.guild_id.as_ref().unwrap().into_nonzero()).unwrap();
-
-    p.enqueue(Link(link.unwrap())).await?;
-    send_text(ctx, "Playing...".to_string()).await?;
+    let track = client.get_player_mut(ctx.interaction.guild_id.unwrap())
+        .unwrap()
+        .enqueue(Link(src))
+        .await?;
+    send_text(ctx, format!("Playing {}", track.title.unwrap()).to_string()).await?;
 
     Ok(())
 }
@@ -79,64 +67,88 @@ pub async fn play(
 #[description = "Joins the specified channel"]
 #[only_guilds]
 pub async fn join(
-    cx: &SlashContext<ArcShared>,
-    #[description = "Channel to join"] channel: VoiceChannelId
+    ctx: &SlashContext<ArcShared>,
 ) -> DefaultCommandResult
 {
-    cx.defer(false).await?;
-    cx.data.nightingale.read().await
-        .join(cx.interaction.guild_id.as_ref().unwrap().into_nonzero(), channel.into_nonzero())
+    let vs = ctx.data.cache.voice_state(
+        ctx.interaction.author_id().unwrap(),
+        ctx.interaction.guild_id.unwrap()
+    ).unwrap();
+
+    ctx.defer(false).await?;
+
+    ctx.data.nightingale.read().await
+        .join(vs.guild_id(), vs.channel_id())
         .await?;
 
-
-    send_text(cx, "Joined voice channel".to_string()).await
+    send_text(ctx, "Joined channel!".to_string()).await
 }
 
 #[command]
 #[checks(player_available)]
 #[description = "Leaves the channel"]
 #[only_guilds]
-pub async fn leave(cx: &SlashContext<ArcShared>) -> DefaultCommandResult {
-    cx.defer(false).await?;
+pub async fn leave(ctx: &SlashContext<ArcShared>) -> DefaultCommandResult {
+    ctx.defer(false).await?;
 
-    cx.data.nightingale.read()
+    ctx.data.nightingale.read()
         .await
-        .leave(cx.interaction.guild_id.as_ref().unwrap().into_nonzero())
+        .leave(ctx.interaction.guild_id.unwrap())
         .await?;
 
-    send_text(cx, "Left channel!".to_string()).await
+    send_text(ctx, "Left channel!".to_string()).await
 }
 
 #[command]
 #[checks(player_available)]
 #[description = "Pauses playback"]
 #[only_guilds]
-pub async fn pause(cx: &SlashContext<ArcShared>) -> DefaultCommandResult {
-    cx.defer(false).await?;
+pub async fn pause(ctx: &SlashContext<ArcShared>) -> DefaultCommandResult {
+    ctx.defer(false).await?;
 
-    cx.data.nightingale.read()
+    ctx.data.nightingale.read()
         .await
-        .get_player_mut(cx.interaction.guild_id.as_ref().unwrap().into_nonzero())
+        .get_player_mut(ctx.interaction.guild_id.unwrap())
         .unwrap()
         .pause()
         .await?;
 
-    send_text(cx, "Paused player!".to_string()).await
+    send_text(ctx, "Player paused!".to_string()).await
 }
 
 #[command]
 #[checks(player_available)]
 #[description = "Resumes playback"]
 #[only_guilds]
-pub async fn resume(cx: &SlashContext<ArcShared>) -> DefaultCommandResult {
-    cx.defer(false).await?;
+pub async fn resume(ctx: &SlashContext<ArcShared>) -> DefaultCommandResult {
+    ctx.defer(false).await?;
 
-    cx.data.nightingale.read()
+    ctx.data.nightingale.read()
         .await
-        .get_player_mut(cx.interaction.guild_id.as_ref().unwrap().into_nonzero())
+        .get_player_mut(ctx.interaction.guild_id.unwrap())
         .unwrap()
         .resume()
         .await?;
 
-    send_text(cx, "Resumed player!".to_string()).await
+    send_text(ctx, "Player resumed!".to_string()).await
+}
+
+#[command]
+#[checks(player_available)]
+#[description = "Changes the player volume"]
+#[only_guilds]
+async fn set_volume(
+    ctx: &SlashContext<ArcShared>,
+    #[description = "The new volume"] volume: u8
+) -> DefaultCommandResult {
+    ctx.defer(false).await?;
+
+    ctx.data.nightingale.read()
+        .await
+        .get_player_mut(ctx.interaction.guild_id.unwrap())
+        .unwrap()
+        .set_volume(volume)
+        .await?;
+
+    send_text(ctx, format!("Set volume to {volume}")).await
 }

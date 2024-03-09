@@ -9,7 +9,6 @@ use serenity::prelude::Context;
 
 lazy_static! {
     static ref URL_REGEX: Regex = Regex::new(r"https?://(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,4}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)").unwrap();
-    static ref HJ: Regex = Regex::new(r#"(https?:\/\/)?([\da-z\.-]+)\.([a-z]{2,6})([\/\w\.-]*)*\/?"#).unwrap();
 }
 
 #[group]
