@@ -43,6 +43,9 @@ use crate::stream::EventStream;
 use crate::events::EventForwarder;
 #[cfg(feature = "twilight")]
 use twilight_gateway::Shard;
+#[cfg(feature = "twilight")]
+use std::collections::HashMap;
+
 use crate::reference::{Reference, ReferenceMut};
 
 pub(crate) struct Shared {
