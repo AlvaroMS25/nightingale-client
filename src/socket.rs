@@ -211,14 +211,14 @@ impl Socket {
         self.sender_send(FromSocketMessage::Disconnected);
     }
 
-    async fn try_connect(&mut self, url: String) {
+    async fn try_connect(&mut self, url: String) -> bool {
         let attempts = self.shared.config.read().connection_attempts;
         for i in 1..=attempts {
             match self.connect(&url).await {
                 Ok(_) => {
                     info!("Connected to nightingale server successfully!");
                     self.sender_send(FromSocketMessage::ConnectedSuccessfully);
-                    return;
+                    return true;
                 },
                 Err(error) => {
                     warn!(
@@ -235,6 +235,7 @@ impl Socket {
         }
 
         error!("Failed to connect to nightingale server after {} attempts", attempts);
+        false
     }
 
     fn handle_payload(&mut self, incoming: Result<IncomingPayload, SocketError>) {
