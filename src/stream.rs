@@ -5,6 +5,8 @@ use parking_lot::Mutex;
 use tokio::sync::mpsc::UnboundedReceiver;
 use crate::events::IncomingEvent;
 
+/// Stream that can be used to receive events from the server. Only one instance can be active at
+/// a time.
 pub struct EventStream<'a> {
     mutex: &'a Mutex<Option<UnboundedReceiver<IncomingEvent>>>,
     recv: Option<UnboundedReceiver<IncomingEvent>>

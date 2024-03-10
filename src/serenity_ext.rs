@@ -22,11 +22,13 @@ impl TypeMapKey for NightingaleKey {
 
 #[async_trait]
 pub trait SerenityExt {
+    /// Registers a new instance of the client into the client's typemap
     fn register_nightingale(
         self,
         config: Config,
         event_handler: impl EventHandler + 'static
     ) -> Self;
+    /// Registers an existing instance into the client's typemap
     fn register_nightingale_from_instance(self, instance: NightingaleClient) -> Self;
 }
 

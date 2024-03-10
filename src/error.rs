@@ -9,10 +9,12 @@ pub(crate) enum SocketError {
     Deserialize(#[from] serde_json::Error)
 }
 
+/// Error status code returned from the server.
 #[derive(Error, Debug)]
 #[error("{0}")]
 pub struct StatusCodeError(pub StatusCode);
 
+/// Errors that can be returned from making HTTP requests.
 #[derive(Debug, Error)]
 pub enum HttpError {
     #[error("Server returned an error message: {0:?}")]

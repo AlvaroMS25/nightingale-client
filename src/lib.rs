@@ -13,12 +13,10 @@ pub mod serenity_ext;
 
 #[cfg(feature = "twilight")]
 mod stream;
-mod reference;
+pub mod reference;
 
-use std::collections::HashMap;
 use std::num::NonZeroU64;
 use std::sync::Arc;
-use dashmap::mapref::one::{Ref, RefMut};
 use parking_lot::RwLock;
 use tokio_tungstenite::tungstenite::Error;
 use uuid::Uuid;

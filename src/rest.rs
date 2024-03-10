@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -48,6 +49,7 @@ impl RestClient {
         *self.shared.session.read()
     }
 
+    /// Searches from the specified source, returning a vector of results.
     pub async fn search<S>(&self, query: String, source: S) -> Result<Vec<S::Track>, HttpError>
     where
         S: SearchSource
@@ -60,6 +62,7 @@ impl RestClient {
         ).await
     }
 
+    /// Queries the playlist items, returning them and the playlist name.
     pub async fn playlist<S>(&self, playlist: String, source: S) -> Result<S::Playlist, HttpError>
     where
         S: SearchSource
@@ -72,8 +75,17 @@ impl RestClient {
         ).await
     }
 
-    pub async fn server_info(&self) -> Result<Info, HttpError> {
-        let res = self.http.get(format!("{}/info", self.base_api_route()))
+    /// Returns information about the server. If `current_session` is set to `true`, then the playback
+    /// field will only represent the current session players.
+    pub async fn server_info(&self, current_session: bool) -> Result<Info, HttpError> {
+        let mut url = format!("{}/info", self.base_api_route());
+
+        if current_session {
+            url.push('/');
+            url.push_str(self.session().to_string().as_str());
+        }
+
+        let res = self.http.get(url)
             .send()
             .await?;
 
