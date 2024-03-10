@@ -1,4 +1,5 @@
 use std::num::NonZeroU64;
+use std::time::Duration;
 
 #[derive(Clone)]
 pub struct Config {
@@ -21,6 +22,20 @@ impl Default for Config {
             user_id: unsafe { NonZeroU64::new_unchecked(1) },
             shards: 1,
             connection_attempts: 5
+        }
+    }
+}
+
+pub struct SessionConfig {
+    enable_resume: bool,
+    reconnect_time: Duration
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            enable_resume: true,
+            reconnect_time: Duration::from_secs(60)
         }
     }
 }

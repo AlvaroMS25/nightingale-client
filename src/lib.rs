@@ -45,12 +45,14 @@ use crate::events::EventForwarder;
 use twilight_gateway::Shard;
 #[cfg(feature = "twilight")]
 use std::collections::HashMap;
+use crate::config::SessionConfig;
 
 use crate::reference::{Reference, ReferenceMut};
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,
-    pub config: RwLock<Config>
+    pub config: RwLock<Config>,
+    pub session_config: RwLock<SessionConfig>
 }
 
 /// Client that handles a single connection to a nightingale server.
@@ -69,7 +71,8 @@ impl NightingaleClient {
         let events = Arc::new(handler) as Arc<dyn EventHandler>;
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
-            config: RwLock::new(config)
+            config: RwLock::new(config),
+            session_config: RwLock::new(SessionConfig::default())
         });
         let rest = RestClient::new(shared.clone());
         let players = Arc::new(PlayerManager::new(rest.clone()));
