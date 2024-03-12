@@ -36,11 +36,11 @@ jobs:
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build docs
-        run: cargo doc --features __build-serenity
+        run: cargo doc --features __build-serenity --no-deps
       - name: Compress tar gz
         run: |
           ls
-          cd /target/doc
+          cd ./target/doc
           tar cvfz github-pages.tar.gz .
           mv ./github-pages.tar.gz ../../
           cd ../../
