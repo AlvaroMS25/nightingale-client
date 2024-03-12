@@ -40,8 +40,8 @@ jobs:
       - name: Compress tar gz
         run: |
           cd ./target/doc
-          tar cvfz github-pages.tar.gz .
-          sleep 10
+          touch github-pages.tar.gz
+          tar --exclude=github-pages.tar.gz -cvfz github-pages.tar.gz .
           mv ./github-pages.tar.gz ../../
           cd ../../
           
