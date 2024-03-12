@@ -14,8 +14,11 @@ nightingale-client = { git = "https://github.com/AlvaroMS25/nightingale-client" 
 Now select one of `twilight` and `serenity` features, this enables the client to be
 used with those two libraries.
 
+Find docs here: [docs]
+
 Now open a connection and you're ready to go!
 A bunch of examples can be found on the [examples] folder
 
 [Nightingale]: https://github.com/AlvaroMS25/nightingale
 [examples]: https://github.com/AlvaroMS25/nightingale-client/tree/master/examples
+[docs]: https://alvaroms25.github.io/nightingale-client/nightingale_client/index.html
