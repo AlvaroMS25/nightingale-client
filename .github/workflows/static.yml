@@ -35,13 +35,13 @@ jobs:
         uses: actions/configure-pages@v4
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Build docs
+        run: cargo doc --features __build-serenity
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          run: |
-            cargo doc --features __build-serenity
-          path: '.target/doc/'
+          path: './target/doc/'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
