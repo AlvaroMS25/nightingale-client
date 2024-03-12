@@ -37,11 +37,18 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Build docs
         run: cargo doc --features __build-serenity
+      - name: Compress tar gz
+        run: |
+          cd /target/doc
+          tar cvfz github-pages.tar.gz .
+          mv ./github-pages.tar.gz ../../
+          cd ../../
+          
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload entire repository
-          path: './target/doc/'
+          path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
