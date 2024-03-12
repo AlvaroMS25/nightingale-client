@@ -37,9 +37,9 @@ pub struct CoreInfo {
 
 #[derive(Debug, Deserialize)]
 pub struct MemoryInfo {
-    /// Memory usage (RSS) in bytes, see [`Process#memory`](sysinfo::Process::memory).
+    /// Memory usage (RSS) in bytes.
     pub memory: u64,
-    /// Virtual memory in bytes, see [`Process#virtual_memory`](sysinfo::Process::virtual_memory)
+    /// Virtual memory in bytes.
     pub virtual_memory: u64
 }
 
