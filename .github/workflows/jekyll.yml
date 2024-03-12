@@ -36,7 +36,7 @@ jobs:
       - name: Install rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build docs
-        run: cargo doc
+        run: cargo doc --features __build-serenity
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v4
