@@ -39,9 +39,9 @@ jobs:
         run: cargo doc --features __build-serenity --no-deps
       - name: Compress tar gz
         run: |
-          ls
           cd ./target/doc
           tar cvfz github-pages.tar.gz .
+          sleep 10
           mv ./github-pages.tar.gz ../../
           cd ../../
           
