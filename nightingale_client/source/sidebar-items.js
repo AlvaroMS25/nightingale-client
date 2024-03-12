@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["Bytes","Link","Youtube"],"trait":["PlaySource","SearchRoute","SearchSource"]};

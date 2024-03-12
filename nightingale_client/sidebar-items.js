@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["config","error","events","model","player","reference","rest","serenity_ext","source"],"struct":["NightingaleClient"]};

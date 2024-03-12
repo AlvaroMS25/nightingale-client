@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["CoreInfo","CpuInfo","Info","MemoryInfo","PlaybackInfo","SystemInfo"]};
