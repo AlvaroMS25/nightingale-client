@@ -4,3 +4,4 @@ pub mod error;
 pub mod search;
 pub mod info;
 pub mod player;
+pub mod connection;

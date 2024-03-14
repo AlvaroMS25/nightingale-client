@@ -48,10 +48,6 @@ pub(crate) struct Socket {
     sender: UnboundedSender<FromSocketMessage>,
     #[cfg(feature = "serenity")]
     events: Arc<dyn EventHandler + 'static>,
-    #[cfg(feature = "serenity")]
-    shards: HashMap<u32, Sender<ShardRunnerMessage>>,
-    #[cfg(feature = "twilight")]
-    shards: HashMap<u64, MessageSender>,
     #[cfg(feature = "twilight")]
     events: UnboundedSender<IncomingEvent>
 }
@@ -71,7 +67,6 @@ impl Socket {
             players,
             sender: from_tx,
             events: event_handler,
-            shards: HashMap::new()
         };
 
         tokio::spawn(async move {
@@ -88,7 +83,6 @@ impl Socket {
     pub fn new(
         shared: Arc<Shared>,
         players: Arc<PlayerManager>,
-        shards: HashMap<u64, MessageSender>
     ) -> SocketHandle {
         let (to_tx, to_rx) = unbounded_channel();
         let (from_tx, from_rx) = unbounded_channel();
@@ -99,7 +93,6 @@ impl Socket {
             shared,
             players,
             sender: from_tx,
-            shards,
             events: events_tx
         };
 
@@ -178,24 +171,6 @@ impl Socket {
 
                 self.try_connect(url).await;
             },
-            ToSocketMessage::Send(payload) => {
-                let Ok(serialized) = serde_json::to_string(&payload) else {
-                    error!("Failed to serialize payload");
-                    return;
-                };
-
-                if let Some(socket) = self.stream.as_mut() {
-                    let _ = socket.send(Message::Text(serialized)).await;
-                }
-            },
-            #[cfg(feature = "serenity")]
-            ToSocketMessage::RegisterShard(id, shard) => {
-                self.shards.insert(id, shard);
-            },
-            #[cfg(feature = "serenity")]
-            ToSocketMessage::DeregisterShard(id) => {
-                self.shards.remove(&id);
-            }
             _ => ()
         }
     }
@@ -267,36 +242,26 @@ impl Socket {
                     events.on_ready(r).await;
                 });
             },
-            IncomingPayload::UpdateState(state) => match state {
-                UpdateState::ConnectGateway(data) => {
-                    tokio::spawn(async move {
-                        events.on_gateway_connect(data).await;
-                    });
-                },
-                UpdateState::ReconnectGateway(data) => {
-                    tokio::spawn(async move {
-                        events.on_gateway_reconnect(data).await;
-                    });
-                },
-                UpdateState::DisconnectGateway(data) => {
-                    tokio::spawn(async move {
-                        events.on_gateway_disconnect(data).await;
-                    });
+            IncomingPayload::UpdateState(state) => {
+                self.update_player(&state);
+                match state {
+                    UpdateState::ConnectGateway(data) => {
+                        tokio::spawn(async move {
+                            events.on_gateway_connect(data).await;
+                        });
+                    },
+                    UpdateState::ReconnectGateway(data) => {
+                        tokio::spawn(async move {
+                            events.on_gateway_reconnect(data).await;
+                        });
+                    },
+                    UpdateState::DisconnectGateway(data) => {
+                        tokio::spawn(async move {
+                            events.on_gateway_disconnect(data).await;
+                        });
+                    }
                 }
             },
-            IncomingPayload::Forward(forward) => {
-                let Some(shard) = self.shards.get(&(forward.shard as u32)) else {
-                    error!("Shard {} not found", forward.shard);
-                    return;
-                };
-
-                let Ok(payload) = serde_json::to_string(&forward.payload) else {
-                    error!("Failed to serialize forward payload");
-                    return;
-                };
-
-                shard.unbounded_send(ShardRunnerMessage::Message(Message::Text(payload))).unwrap()
-            }
             IncomingPayload::Event { guild_id, event } => {
                 let players = Arc::clone(&self.players);
 
@@ -321,22 +286,13 @@ impl Socket {
 
                 IncomingEvent::Ready(r)
             },
-            IncomingPayload::Forward(p) => {
-                let Some(sender) = self.shards.get(&p.shard) else {
-                    error!("Shard {} not found", p.shard);
-                    return;
-                };
+            other => {
+                if let IncomingPayload::UpdateState(s) = &other {
+                    self.update_player(s);
+                }
 
-                let Ok(payload) = serde_json::to_string(&p.payload) else {
-                    error!("Failed to serialize forward payload");
-                    return;
-                };
-
-                let _ = sender.send(payload);
-
-                return;
-            },
-            other => other.into()
+                other.into()
+            }
         };
 
         let _ = self.events.send(p).unwrap();
@@ -355,6 +311,17 @@ impl Socket {
         self.stream = Some(connection);
 
         Ok(())
+    }
+
+    fn update_player(&self, state: &UpdateState) {
+        let (guild, channel) = match state {
+            UpdateState::ConnectGateway(d)
+            | UpdateState::ReconnectGateway(d) => (d.guild_id, d.channel_id),
+            UpdateState::DisconnectGateway(d) => (d.guild_id, d.channel_id)
+        };
+
+        self.players.get_or_insert_mut(guild.get())
+            .channel = channel;
     }
 }
 

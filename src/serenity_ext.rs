@@ -13,6 +13,7 @@ use crate::events::EventHandler;
 use crate::msg::ToSocketMessage;
 use crate::{NightingaleClient, Shared};
 use tokio::sync::mpsc::UnboundedSender as TokioSender;
+use crate::manager::PlayerManager;
 
 pub struct NightingaleKey;
 
@@ -52,7 +53,7 @@ impl SerenityExt for ClientBuilder {
 
 pub(crate) struct NightingaleVoiceManager {
     pub shared: Arc<Shared>,
-    pub sender: TokioSender<ToSocketMessage>
+    pub players: Arc<PlayerManager>
 }
 
 #[async_trait]
@@ -65,37 +66,28 @@ impl VoiceGatewayManager for NightingaleVoiceManager {
     }
 
     async fn register_shard(&self, shard_id: u32, sender: UnboundedSender<ShardRunnerMessage>) {
-        self.sender.send(ToSocketMessage::RegisterShard(shard_id, sender)).unwrap();
+        self.shared.shards.shards.insert(shard_id as _, sender);
     }
 
     async fn deregister_shard(&self, shard_id: u32) {
-        self.sender.send(ToSocketMessage::DeregisterShard(shard_id)).unwrap()
+        self.shared.shards.shards.remove(&(shard_id as _));
     }
 
     async fn server_update(&self, guild_id: GuildId, endpoint: &Option<String>, token: &str) {
-        let value = json!({
-            "op": "update_voice_server",
-            "data": {
-                "guild_id": guild_id.get(),
-                "endpoint": endpoint,
-                "token": token
-            }
-        });
+        let mut p = self.players.get_or_insert_mut(guild_id.get());
 
-        self.sender.send(ToSocketMessage::Send(value)).unwrap();
+        p.info.endpoint = endpoint.clone();
+        p.info.token = Some(token.to_string());
+
+        let _ = p.update_state().await;
     }
 
     async fn state_update(&self, guild_id: GuildId, voice_state: &VoiceState) {
-        let value = json!({
-            "op": "update_voice_state",
-            "data": {
-                "guild_id": guild_id.get(),
-                "user_id": voice_state.user_id.get(),
-                "session_id": &voice_state.session_id,
-                "channel_id": voice_state.channel_id.map(|c| c.get())
-            }
-        });
+        let mut p = self.players.get_or_insert_mut(guild_id.get());
 
-        self.sender.send(ToSocketMessage::Send(value)).unwrap();
+        p.info.channel_id = voice_state.channel_id.map(Into::into);
+        p.info.session_id = Some(voice_state.session_id.clone());
+
+        let _ = p.update_state().await;
     }
 }

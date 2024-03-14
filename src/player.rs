@@ -1,6 +1,15 @@
 use std::num::NonZeroU64;
+#[cfg(feature = "serenity")]
+use serenity::gateway::ShardRunnerMessage;
+#[cfg(feature = "serenity")]
+use futures::channel::mpsc::UnboundedSender as Sender;
+use futures::SinkExt;
+use serde_json::json;
+#[cfg(feature = "twilight")]
+use twilight_gateway::MessageSender;
 use typemap_rev::TypeMap;
 use crate::error::HttpError;
+use crate::model::connection::PartialConnectionInfo;
 use crate::model::player::PlayerInfo;
 use crate::model::track::Track;
 use crate::rest::RestClient;
@@ -9,24 +18,56 @@ use crate::source::PlaySource;
 /// A player assigned to a guild.
 pub struct Player {
     http: RestClient,
-    queue: Vec<Track>,
-    current: Option<Track>,
+    pub(crate) queue: Vec<Track>,
+    pub(crate) current: Option<Track>,
     paused: bool,
     volume: u8,
+    deaf: bool,
+    mute: bool,
     data: TypeMap,
-    guild: NonZeroU64
+    guild: NonZeroU64,
+    pub(crate) channel: Option<NonZeroU64>,
+    #[cfg(feature = "serenity")]
+    shard: Sender<ShardRunnerMessage>,
+    #[cfg(feature = "twilight")]
+    shard: MessageSender,
+    pub(crate) info: PartialConnectionInfo
 }
 
 impl Player {
-    pub(crate) fn new(http: RestClient, guild: NonZeroU64) -> Self {
+    #[cfg(feature = "serenity")]
+    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: Sender<ShardRunnerMessage>) -> Self {
         Self {
             http,
             queue: Vec::new(),
             current: None,
             data: TypeMap::new(),
             guild,
+            channel: None,
             paused: false,
-            volume: 100
+            volume: 100,
+            deaf: false,
+            mute: false,
+            shard,
+            info: Default::default()
+        }
+    }
+
+    #[cfg(feature = "twilight")]
+    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: MessageSender) -> Self {
+        Self {
+            http,
+            queue: Vec::new(),
+            current: None,
+            data: TypeMap::new(),
+            guild,
+            channel: None,
+            paused: false,
+            volume: 100,
+            deaf: false,
+            mute: false,
+            shard,
+            info: Default::default()
         }
     }
 
@@ -103,5 +144,75 @@ impl Player {
                     r
                 })
         }
+    }
+
+    fn update(&mut self, channel: Option<NonZeroU64>) {
+        let value = json!({
+            "op": 4,
+            "d": {
+                "channel_id": channel.map(|c| c.get()),
+                "guild_id": self.guild,
+                "self_deaf": self.deaf,
+                "self_mute": self.mute,
+            }
+        });
+
+        #[cfg(feature = "serenity")]
+        {
+            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into()));
+        }
+
+        #[cfg(feature = "twilight")]
+        {
+            let _ = self.shard.send(value.to_string());
+        }
+    }
+
+    fn set_deaf(&mut self, deaf: bool) {
+        self.deaf = deaf;
+        self.update(self.channel);
+    }
+
+    fn set_mute(&mut self, mute: bool) {
+        self.mute = mute;
+        self.update(self.channel);
+    }
+
+    pub async fn connect_to(&mut self, channel: impl Into<NonZeroU64>) {
+        self.update(self.channel);
+    }
+
+    pub async fn disconnect(&mut self) -> Result<(), HttpError> {
+        let value = json!({
+            "op": 4,
+            "d": {
+                "channel_id": null,
+                "guild_id": self.guild.get(),
+                "self_deaf": self.deaf,
+                "self_mute": self.mute,
+            }
+        });
+
+        #[cfg(feature = "serenity")]
+        {
+            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into()));
+        }
+
+        #[cfg(feature = "twilight")]
+        {
+            let _ = self.shard.send(value.to_string());
+        }
+
+        self.http.update_player(self.guild, None).await
+    }
+
+    pub(crate) async fn update_state(&mut self) -> Result<(), HttpError> {
+        if !self.info.complete() {
+            return Ok(())
+        }
+
+        let info = std::mem::take(&mut self.info).into_info();
+
+        self.http.update_player(self.guild, Some(info)).await
     }
 }

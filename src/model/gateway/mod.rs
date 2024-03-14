@@ -11,7 +11,6 @@ use serde::Deserialize;
 #[serde(rename_all = "snake_case")]
 pub(crate) enum IncomingPayload {
     Ready(ready::Ready),
-    Forward(forward::Forward),
     UpdateState(state::UpdateState),
     Event {
         guild_id: u64,

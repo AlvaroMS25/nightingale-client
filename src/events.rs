@@ -1,3 +1,5 @@
+use std::num::NonZeroU64;
+use std::sync::Arc;
 use crate::model::gateway::ready::Ready;
 #[cfg(feature = "serenity")]
 use crate::model::gateway::event::{TrackEnd, TrackErrored};
@@ -19,6 +21,8 @@ use crate::msg::ToSocketMessage;
 use twilight_model::gateway::event::Event as TwilightEvent;
 #[cfg(feature = "twilight")]
 use serde_json::json;
+use crate::manager::PlayerManager;
+use crate::Shared;
 
 #[cfg(feature = "serenity")]
 /// Trait defining what events can be fired from the server.
@@ -62,7 +66,6 @@ impl From<IncomingPayload> for IncomingEvent {
     fn from(value: IncomingPayload) -> Self {
         match value {
             IncomingPayload::Ready(r) => Self::Ready(r),
-            IncomingPayload::Forward(_) => unreachable!(),
             IncomingPayload::UpdateState(s) => Self::UpdateState(s),
             IncomingPayload::Event { guild_id, event } => Self::Event { guild_id, event }
         }
@@ -71,35 +74,49 @@ impl From<IncomingPayload> for IncomingEvent {
 
 #[cfg(feature = "twilight")]
 pub struct EventForwarder {
-    pub(crate) sender: UnboundedSender<ToSocketMessage>
+    pub(crate) players: Arc<PlayerManager>
 }
 
 #[cfg(feature = "twilight")]
 impl EventForwarder {
     /// Forwards an event to the server. This call does not forward the full event to the server,
     /// instead it only uses the minimum required information by the server.
-    pub fn forward(&self, event: &TwilightEvent) {
+    pub async fn forward(&self, event: &TwilightEvent) {
         let p = match event {
-            TwilightEvent::VoiceServerUpdate(su) => json!({
-                "op": "update_voice_server",
-                "data": {
-                    "guild_id": su.guild_id.get(),
-                    "endpoint": &su.endpoint,
-                    "token": &su.token
-                }
-            }),
-            TwilightEvent::VoiceStateUpdate(su) => json!({
-                "op": "update_voice_state",
-                "data": {
-                    "guild_id": su.guild_id.map(|g| g.get()),
-                    "user_id": su.user_id.get(),
-                    "session_id": &su.session_id,
-                    "channel_id": su.channel_id.map(|c| c.get())
-                }
-            }),
+            TwilightEvent::VoiceServerUpdate(su) => {
+                self.server_update(
+                    su.guild_id.get(),
+                    su.endpoint.clone(),
+                    su.token.clone()
+                ).await
+            },
+            TwilightEvent::VoiceStateUpdate(su) => {
+                let Some(guild) = su.guild_id else { return; };
+                self.state_update(
+                    guild.get(),
+                    su.channel_id.map(|c| c.into_nonzero()),
+                    su.session_id.clone()
+                ).await;
+            },
             _ => return
         };
+    }
 
-        self.sender.send(ToSocketMessage::Send(p)).unwrap();
+    async fn state_update(&self, guild: u64, channel_id: Option<NonZeroU64>, session_id: String) {
+        let mut p = self.players.get_or_insert_mut(guild);
+
+        p.info.channel_id = channel_id;
+        p.info.session_id = Some(session_id);
+
+        let _ = p.update_state().await;
+    }
+
+    async fn server_update(&self, guild: u64, endpoint: Option<String>, token: String) {
+        let mut p = self.players.get_or_insert_mut(guild);
+
+        p.info.endpoint = endpoint;
+        p.info.token = Some(token);
+
+        let _ = p.update_state().await;
     }
 }

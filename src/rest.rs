@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::json;
 use uuid::Uuid;
 use crate::error::{HttpError, StatusCodeError};
+use crate::model::connection::ConnectionInfo;
 use crate::model::error::ErrorResponse;
 use crate::model::info::Info;
 use crate::model::player::PlayerInfo;
@@ -96,7 +97,7 @@ impl RestClient {
         }
     }
 
-    pub(crate) async fn connect(&self, guild: NonZeroU64, channel: NonZeroU64) -> Result<(), HttpError> {
+    /*pub(crate) async fn connect(&self, guild: NonZeroU64, channel: NonZeroU64) -> Result<(), HttpError> {
         let session = self.session();
 
         let url = format!(
@@ -122,6 +123,29 @@ impl RestClient {
         let session = self.session();
         let url = format!("{}/{session}/players/{guild}/disconnect", self.base_api_route());
         let res = self.http.delete(url)
+            .send()
+            .await?;
+
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            Err(res.json::<ErrorResponse>()
+                .await
+                .map(HttpError::ErrorMessage)
+                .unwrap_or_else(From::from))
+        }
+    }*/
+
+    pub(crate) async fn update_player(
+        &self,
+        guild: NonZeroU64,
+        info: Option<ConnectionInfo>
+    ) -> Result<(), HttpError> {
+        let session = self.session();
+        let url = format!("{}/{session}/players/{guild}", self.base_api_route());
+
+        let res = self.http.patch(url)
+            .json(&info)
             .send()
             .await?;
 

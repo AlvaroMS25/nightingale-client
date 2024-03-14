@@ -14,6 +14,7 @@ pub mod serenity_ext;
 #[cfg(feature = "twilight")]
 mod stream;
 pub mod reference;
+mod shard;
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
@@ -45,14 +46,20 @@ use crate::events::EventForwarder;
 use twilight_gateway::Shard;
 #[cfg(feature = "twilight")]
 use std::collections::HashMap;
+use futures::SinkExt;
+use serde_json::json;
+#[cfg(feature = "serenity")]
+use serenity::all::ShardRunnerMessage;
 use crate::config::SessionConfig;
 
 use crate::reference::{Reference, ReferenceMut};
+use crate::shard::ShardStorage;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,
     pub config: RwLock<Config>,
-    pub session_config: RwLock<SessionConfig>
+    pub session_config: RwLock<SessionConfig>,
+    pub shards: ShardStorage
 }
 
 /// Client that handles a single connection to a nightingale server.
@@ -72,10 +79,11 @@ impl NightingaleClient {
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
             config: RwLock::new(config),
-            session_config: RwLock::new(SessionConfig::default())
+            session_config: RwLock::new(SessionConfig::default()),
+            shards: ShardStorage::new(),
         });
         let rest = RestClient::new(shared.clone());
-        let players = Arc::new(PlayerManager::new(rest.clone()));
+        let players = Arc::new(PlayerManager::new(rest.clone(), shared.clone()));
 
         Self {
             socket: Socket::new(
@@ -101,17 +109,18 @@ impl NightingaleClient {
 
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
-            config: RwLock::new(config)
+            config: RwLock::new(config),
+            session_config: RwLock::new(SessionConfig::default()),
+            shards: ShardStorage::new(map)
         });
 
         let rest = RestClient::new(shared.clone());
-        let players = Arc::new(PlayerManager::new(rest.clone()));
+        let players = Arc::new(PlayerManager::new(rest.clone(), shared.clone()));
 
         Self {
             socket: Socket::new(
                 shared.clone(),
                 players.clone(),
-                map
             ),
             http: rest,
             shared,
@@ -126,7 +135,7 @@ impl NightingaleClient {
     pub fn voice_manager(&self) -> Arc<dyn VoiceGatewayManager> {
         Arc::new(NightingaleVoiceManager {
             shared: self.shared.clone(),
-            sender: self.socket.sender.clone()
+            players: self.players.clone()
         })
     }
 
@@ -177,34 +186,51 @@ impl NightingaleClient {
     /// events, this will only send the minimum required fields in the payload, not the whole event.
     pub fn events_forwarder(&self) -> EventForwarder {
         EventForwarder {
-            sender: self.socket.sender.clone()
+            players: self.players.clone()
         }
     }
 
     /// Joins the given voice channel.
     pub async fn join<G, C>(&self, guild: G, channel: C)
-        -> Result<(), HttpError>
+        -> Reference<Player>
     where
         G: Into<NonZeroU64>,
         C: Into<NonZeroU64>
     {
         let guild = guild.into();
-        self.http.connect(guild.into(), channel.into()).await
-            .map(|res| {
-                self.players.get_or_insert(guild.get());
-                res
-            })
+
+        let mut sender = self.shared.shards.for_guild(guild.get());
+
+        let value = json!({
+            "op": 4,
+            "d": {
+                "channel_id": channel.into().get(),
+                "guild_id": guild.get(),
+                "self_deaf": false,
+                "self_mute": false,
+            }
+        });
+
+        #[cfg(feature = "serenity")]
+        {
+            let _ = sender.send(ShardRunnerMessage::Message(value.to_string().into()));
+        }
+
+        #[cfg(feature = "twilight")]
+        {
+            let _ = sender.send(value.to_string());
+        }
+
+        self.players.get_or_insert(guild.get()).into()
     }
 
     /// Leaves the given voice channel.
     pub async fn leave<G: Into<NonZeroU64>>(&self, guild: G)
         -> Result<(), HttpError> {
         let guild = guild.into();
-        self.http.disconnect(guild).await
-            .map(|res| {
-                self.players.players.remove(&guild.get());
-                res
-            })
+        let Some((_, mut p)) = self.players.players.remove(&guild.get()) else { return Ok(()) };
+
+        p.disconnect().await
     }
 
     /// Makes a search on the provided source.

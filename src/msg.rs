@@ -9,11 +9,6 @@ pub(crate) enum ToSocketMessage {
     Disconnect,
     Reconnect,
     Resume,
-    Send(Value),
-    #[cfg(feature = "serenity")]
-    RegisterShard(u32, UnboundedSender<ShardRunnerMessage>),
-    #[cfg(feature = "serenity")]
-    DeregisterShard(u32),
     Kill
 }
 
