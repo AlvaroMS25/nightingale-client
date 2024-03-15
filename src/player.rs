@@ -13,6 +13,7 @@ use crate::model::connection::PartialConnectionInfo;
 use crate::model::player::PlayerInfo;
 use crate::model::track::Track;
 use crate::rest::RestClient;
+use crate::shard::ShardWrapper;
 use crate::source::PlaySource;
 
 /// A player assigned to a guild.
@@ -28,33 +29,12 @@ pub struct Player {
     guild: NonZeroU64,
     pub(crate) channel: Option<NonZeroU64>,
     #[cfg(feature = "serenity")]
-    shard: Sender<ShardRunnerMessage>,
-    #[cfg(feature = "twilight")]
-    shard: MessageSender,
+    shard: ShardWrapper,
     pub(crate) info: PartialConnectionInfo
 }
 
 impl Player {
-    #[cfg(feature = "serenity")]
-    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: Sender<ShardRunnerMessage>) -> Self {
-        Self {
-            http,
-            queue: Vec::new(),
-            current: None,
-            data: TypeMap::new(),
-            guild,
-            channel: None,
-            paused: false,
-            volume: 100,
-            deaf: false,
-            mute: false,
-            shard,
-            info: Default::default()
-        }
-    }
-
-    #[cfg(feature = "twilight")]
-    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: MessageSender) -> Self {
+    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: ShardWrapper) -> Self {
         Self {
             http,
             queue: Vec::new(),
@@ -159,12 +139,12 @@ impl Player {
 
         #[cfg(feature = "serenity")]
         {
-            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
+            self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
         }
 
         #[cfg(feature = "twilight")]
         {
-            let _ = self.shard.send(value.to_string());
+            self.shard.send(value.to_string()).await;
         }
     }
 
@@ -195,12 +175,12 @@ impl Player {
 
         #[cfg(feature = "serenity")]
         {
-            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
+            self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
         }
 
         #[cfg(feature = "twilight")]
         {
-            let _ = self.shard.send(value.to_string());
+            self.shard.send(value.to_string()).await;
         }
 
         self.http.update_player(self.guild, None).await

@@ -215,13 +215,12 @@ impl NightingaleClient {
 
         #[cfg(feature = "serenity")]
         {
-            let s = sender.send(ShardRunnerMessage::Message(value.to_string().into())).await;
-            tracing::info!("Sent? {s:?}");
+            sender.send(ShardRunnerMessage::Message(value.to_string().into())).await;
         }
 
         #[cfg(feature = "twilight")]
         {
-            let _ = sender.send(value.to_string());
+            sender.send(value.to_string()).await;
         }
 
         self.players.get_or_insert(guild.get()).into()
