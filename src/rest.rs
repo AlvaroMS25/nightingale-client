@@ -142,7 +142,7 @@ impl RestClient {
         info: Option<ConnectionInfo>
     ) -> Result<(), HttpError> {
         let session = self.session();
-        let url = format!("{}/{session}/players/{guild}", self.base_api_route());
+        let url = format!("{}/{session}/players/{guild}/update", self.base_api_route());
 
         let res = self.http.patch(url)
             .json(&info)

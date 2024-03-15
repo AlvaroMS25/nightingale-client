@@ -146,7 +146,7 @@ impl Player {
         }
     }
 
-    fn update(&mut self, channel: Option<NonZeroU64>) {
+    async fn update(&mut self, channel: Option<NonZeroU64>) {
         let value = json!({
             "op": 4,
             "d": {
@@ -159,7 +159,7 @@ impl Player {
 
         #[cfg(feature = "serenity")]
         {
-            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into()));
+            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
         }
 
         #[cfg(feature = "twilight")]
@@ -168,18 +168,18 @@ impl Player {
         }
     }
 
-    fn set_deaf(&mut self, deaf: bool) {
+    pub async fn set_deaf(&mut self, deaf: bool) {
         self.deaf = deaf;
-        self.update(self.channel);
+        self.update(self.channel).await;
     }
 
-    fn set_mute(&mut self, mute: bool) {
+    pub async fn set_mute(&mut self, mute: bool) {
         self.mute = mute;
-        self.update(self.channel);
+        self.update(self.channel).await;
     }
 
     pub async fn connect_to(&mut self, channel: impl Into<NonZeroU64>) {
-        self.update(self.channel);
+        self.update(Some(channel.into())).await;
     }
 
     pub async fn disconnect(&mut self) -> Result<(), HttpError> {
@@ -195,7 +195,7 @@ impl Player {
 
         #[cfg(feature = "serenity")]
         {
-            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into()));
+            let _ = self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
         }
 
         #[cfg(feature = "twilight")]

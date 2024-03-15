@@ -211,9 +211,12 @@ impl NightingaleClient {
             }
         });
 
+        tracing::info!("Sending payload {value}");
+
         #[cfg(feature = "serenity")]
         {
-            let _ = sender.send(ShardRunnerMessage::Message(value.to_string().into()));
+            let s = sender.send(ShardRunnerMessage::Message(value.to_string().into())).await;
+            tracing::info!("Sent? {s:?}");
         }
 
         #[cfg(feature = "twilight")]
