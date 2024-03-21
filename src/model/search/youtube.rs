@@ -4,6 +4,10 @@ use serde::Deserialize;
 pub struct YoutubePlaylist {
     /// Name of the playlist.
     pub name: String,
+    pub id: String,
+    pub url: String,
+    pub channel: String,
+    pub thumbnail: Option<String>,
     /// Tracks of the playlist.
     pub tracks: Vec<YoutubeTrack>
 }
@@ -18,8 +22,6 @@ pub struct YoutubeTrack {
     pub length: u128,
     /// Id of the video.
     pub video_id: String,
-    /// Whether if the video is a stream.
-    pub is_stream: bool,
     /// The url of the video.
     pub url: String,
     /// The thumbnail of the video.

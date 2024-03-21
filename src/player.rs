@@ -5,6 +5,7 @@ use serenity::gateway::ShardRunnerMessage;
 use futures::channel::mpsc::UnboundedSender as Sender;
 use futures::SinkExt;
 use serde_json::json;
+use tracing::info;
 #[cfg(feature = "twilight")]
 use twilight_gateway::MessageSender;
 use typemap_rev::TypeMap;
@@ -163,6 +164,8 @@ impl Player {
     }
 
     pub async fn disconnect(&mut self) -> Result<(), HttpError> {
+        self.http.update_player(self.guild, None).await?;
+
         let value = json!({
             "op": 4,
             "d": {
@@ -183,7 +186,7 @@ impl Player {
             self.shard.send(value.to_string()).await;
         }
 
-        self.http.update_player(self.guild, None).await
+        Ok(())
     }
 
     pub(crate) async fn update_state(&mut self) -> Result<(), HttpError> {

@@ -56,6 +56,7 @@ impl RestClient {
         S: SearchSource
     {
         let _ = source;
+        println!("Searching at: {}", format!("{}/search{}", self.base_api_route(), S::track(query.clone())));
         deserialize_json::<Vec<S::Track>>(
             self.http.get(format!("{}/search{}", self.base_api_route(), S::track(query)))
                 .send()
@@ -96,45 +97,6 @@ impl RestClient {
             Err(HttpError::UnexpectedStatus(StatusCodeError(res.status())))
         }
     }
-
-    /*pub(crate) async fn connect(&self, guild: NonZeroU64, channel: NonZeroU64) -> Result<(), HttpError> {
-        let session = self.session();
-
-        let url = format!(
-            "{}/{session}/players/{guild}/connect?channel_id={channel}",
-            self.base_api_route()
-        );
-        let res = self.http.put(url)
-            .send()
-            .await?;
-
-        if res.status().is_success() {
-            Ok(())
-        } else {
-            Err(res.json::<ErrorResponse>()
-                .await
-                .map(HttpError::ErrorMessage)
-                .unwrap_or_else(From::from))
-        }
-    }
-
-    pub(crate) async fn disconnect(&self, guild: NonZeroU64) -> Result<(), HttpError>
-    {
-        let session = self.session();
-        let url = format!("{}/{session}/players/{guild}/disconnect", self.base_api_route());
-        let res = self.http.delete(url)
-            .send()
-            .await?;
-
-        if res.status().is_success() {
-            Ok(())
-        } else {
-            Err(res.json::<ErrorResponse>()
-                .await
-                .map(HttpError::ErrorMessage)
-                .unwrap_or_else(From::from))
-        }
-    }*/
 
     pub(crate) async fn update_player(
         &self,

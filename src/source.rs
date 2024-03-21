@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use crate::model::search::youtube::{YoutubePlaylist, YoutubeTrack};
+use crate::model::track::Track;
 
 /// Represents the routes of the different search sources.
 pub trait SearchRoute {
@@ -30,7 +31,7 @@ impl SearchRoute for Youtube {
     }
 
     fn playlist(playlist: String) -> String {
-        format!("/youtube/playlist?playlist_id={}", urlencoding::encode(&playlist))
+        format!("/youtube/playlist?playlist={}", urlencoding::encode(&playlist))
     }
 }
 
@@ -52,7 +53,50 @@ impl PlaySource for Link {
     fn value_for(self) -> Value {
         json!({
             "type": "link",
-            "data": self.0
+            "data": {
+                "link": self.0
+            }
+        })
+    }
+}
+
+pub struct Http(pub String);
+impl PlaySource for Http {
+    fn value_for(self) -> Value {
+        json!({
+            "type": "http",
+            "data": {
+                "link": self.0
+            }
+        })
+    }
+}
+
+pub struct HttpWithTrack(pub String, pub Track);
+
+impl PlaySource for HttpWithTrack {
+    fn value_for(self) -> Value {
+        let serialized = serde_json::to_value(&self.1).expect("Shouldn't fail");
+        json!({
+            "type": "http",
+            "data": {
+                "link": self.0,
+                "track": serialized
+            }
+        })
+    }
+}
+
+pub struct ForceYtDlp(pub String);
+
+impl PlaySource for ForceYtDlp {
+    fn value_for(self) -> Value {
+        json!({
+            "type": "http",
+            "data": {
+                "link": self.0,
+                "force_ytdlp": true
+            }
         })
     }
 }
