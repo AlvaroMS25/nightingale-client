@@ -74,7 +74,6 @@ impl NightingaleClient {
     #[cfg(feature = "serenity")]
     /// Creates a new instance to be used with serenity.
     pub fn new_serenity(config: Config, handler: impl EventHandler + 'static) -> Self {
-        assert_ne!(config.user_id.get(), 1);
         let events = Arc::new(handler) as Arc<dyn EventHandler>;
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
@@ -103,7 +102,7 @@ impl NightingaleClient {
     where
         I: IntoIterator<Item = &'a Shard>
     {
-        assert_ne!(config.user_id.get(), 1);
+        assert!(config.user_id.is_some());
         let map = shards.into_iter().map(|s| (s.id().number(), s.sender()))
             .collect::<HashMap<_, _>>();
 

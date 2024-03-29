@@ -149,10 +149,9 @@ impl Socket {
                     let config = self.shared.config.read();
 
                     format!(
-                        "{}?shards={}&user_id={}",
+                        "{}?user_id={}",
                         self.connect_uri(),
-                        config.shards,
-                        config.user_id
+                        config.user_id.unwrap()
                     )
                 };
 
