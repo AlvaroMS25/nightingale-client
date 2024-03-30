@@ -177,7 +177,7 @@ impl NightingaleClient {
     /// another stream present, this will return `None`, after dropping the other stream this method
     /// will return `Some` again
     pub fn events(&self) -> Option<EventStream> {
-        EventStream::new(&self.socket.events)
+        EventStream::new(self.socket.events.clone())
     }
 
     #[cfg(feature = "twilight")]

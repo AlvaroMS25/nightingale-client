@@ -37,7 +37,7 @@ pub struct SocketHandle {
     pub sender: UnboundedSender<ToSocketMessage>,
     pub receiver: UnboundedReceiver<FromSocketMessage>,
     #[cfg(feature = "twilight")]
-    pub events: Mutex<Option<UnboundedReceiver<IncomingEvent>>>,
+    pub events: Arc<Mutex<Option<UnboundedReceiver<IncomingEvent>>>>,
 }
 
 /// A websocket client to te gateway.
@@ -103,7 +103,7 @@ impl Socket {
         SocketHandle {
             sender: to_tx,
             receiver: from_rx,
-            events: Mutex::new(Some(events_rx))
+            events: Arc::new(Mutex::new(Some(events_rx)))
         }
     }
 
