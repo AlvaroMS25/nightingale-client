@@ -29,7 +29,6 @@ pub struct Player {
     data: TypeMap,
     guild: NonZeroU64,
     pub(crate) channel: Option<NonZeroU64>,
-    #[cfg(feature = "serenity")]
     shard: ShardWrapper,
     pub(crate) info: PartialConnectionInfo
 }
