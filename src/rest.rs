@@ -56,7 +56,6 @@ impl RestClient {
         S: SearchSource
     {
         let _ = source;
-        println!("Searching at: {}", format!("{}/search{}", self.base_api_route(), S::track(query.clone())));
         deserialize_json::<Vec<S::Track>>(
             self.http.get(format!("{}/search{}", self.base_api_route(), S::track(query)))
                 .send()
