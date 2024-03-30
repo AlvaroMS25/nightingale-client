@@ -12,7 +12,7 @@ pub mod events;
 pub mod serenity_ext;
 
 #[cfg(feature = "twilight")]
-mod stream;
+pub mod stream;
 pub mod reference;
 mod shard;
 
