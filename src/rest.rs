@@ -183,7 +183,7 @@ impl RestClient {
     pub(crate) async fn player_set_volume(
         &self,
         guild: NonZeroU64,
-        volume: u8
+        volume: f32
     ) -> Result<(), HttpError>
     {
         let session = self.session();
