@@ -23,7 +23,7 @@ pub struct Player {
     pub(crate) queue: Vec<Track>,
     pub(crate) current: Option<Track>,
     paused: bool,
-    volume: f32,
+    volume: u16,
     deaf: bool,
     mute: bool,
     data: TypeMap,
@@ -43,7 +43,7 @@ impl Player {
             guild,
             channel: None,
             paused: false,
-            volume: 1.0,
+            volume: 100,
             deaf: false,
             mute: false,
             shard,
@@ -113,7 +113,7 @@ impl Player {
     }
 
     /// Sets a new volume, the default value is 100.
-    pub async fn set_volume(&mut self, volume: f32) -> Result<(), HttpError> {
+    pub async fn set_volume(&mut self, volume: u16) -> Result<(), HttpError> {
         if self.volume == volume {
             Ok(())
         } else {
