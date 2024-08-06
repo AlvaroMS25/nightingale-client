@@ -1,3 +1,35 @@
+use std::num::NonZeroU64;
+use std::sync::Arc;
+
+use futures::SinkExt;
+use parking_lot::RwLock;
+#[cfg(feature = "serenity")]
+use serenity::gateway::VoiceGatewayManager;
+use songbird::ConnectionInfo;
+use tokio_tungstenite::tungstenite::Error;
+use uuid::Uuid;
+
+use config::Config;
+use socket::Socket;
+
+use crate::config::SessionConfig;
+use crate::error::HttpError;
+#[cfg(feature = "twilight")]
+use crate::events::EventForwarder;
+#[cfg(feature = "serenity")]
+use crate::events::EventHandler;
+use crate::manager::PlayerManager;
+use crate::msg::{FromSocketMessage, ToSocketMessage};
+use crate::player::Player;
+use crate::reference::{Reference, ReferenceMut};
+use crate::rest::RestClient;
+#[cfg(feature = "serenity")]
+use crate::serenity_ext::NightingaleVoiceManager;
+use crate::socket::SocketHandle;
+use crate::source::SearchSource;
+#[cfg(feature = "twilight")]
+use crate::stream::EventStream;
+
 pub mod model;
 pub mod config;
 pub mod error;
@@ -14,45 +46,6 @@ pub mod serenity_ext;
 #[cfg(feature = "twilight")]
 pub mod stream;
 pub mod reference;
-
-use std::num::NonZeroU64;
-use std::sync::Arc;
-use parking_lot::RwLock;
-use tokio_tungstenite::tungstenite::Error;
-use uuid::Uuid;
-use socket::Socket;
-use config::Config;
-use crate::error::HttpError;
-use crate::manager::PlayerManager;
-use crate::msg::{FromSocketMessage, ToSocketMessage};
-use crate::rest::RestClient;
-use crate::socket::SocketHandle;
-
-#[cfg(feature = "serenity")]
-use crate::events::EventHandler;
-#[cfg(feature = "serenity")]
-use serenity::gateway::VoiceGatewayManager;
-#[cfg(feature = "serenity")]
-use crate::serenity_ext::NightingaleVoiceManager;
-
-use crate::player::Player;
-use crate::source::SearchSource;
-#[cfg(feature = "twilight")]
-use crate::stream::EventStream;
-#[cfg(feature = "twilight")]
-use crate::events::EventForwarder;
-#[cfg(feature = "twilight")]
-use twilight_gateway::Shard;
-#[cfg(feature = "twilight")]
-use std::collections::HashMap;
-use futures::SinkExt;
-use serde_json::json;
-#[cfg(feature = "serenity")]
-use serenity::all::ShardRunnerMessage;
-use songbird::ConnectionInfo;
-use crate::config::SessionConfig;
-
-use crate::reference::{Reference, ReferenceMut};
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,

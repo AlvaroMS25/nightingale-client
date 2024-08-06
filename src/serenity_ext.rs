@@ -1,18 +1,16 @@
-use std::num::NonZeroU64;
 use std::sync::Arc;
+
 use futures::channel::mpsc::UnboundedSender;
-use serde_json::json;
 use serenity::all::{GuildId, ShardRunnerMessage, UserId, VoiceState};
 use serenity::async_trait;
 use serenity::client::ClientBuilder;
 use serenity::gateway::VoiceGatewayManager;
 use tokio::sync::RwLock;
 use typemap_rev::TypeMapKey;
+
+use crate::{NightingaleClient, Shared};
 use crate::config::Config;
 use crate::events::EventHandler;
-use crate::msg::ToSocketMessage;
-use crate::{NightingaleClient, Shared};
-use tokio::sync::mpsc::UnboundedSender as TokioSender;
 use crate::manager::PlayerManager;
 
 pub struct NightingaleKey;

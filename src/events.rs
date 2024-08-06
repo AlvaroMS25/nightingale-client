@@ -21,6 +21,7 @@ use crate::msg::ToSocketMessage;
 use twilight_model::gateway::event::Event as TwilightEvent;
 #[cfg(feature = "twilight")]
 use serde_json::json;
+use tracing::error;
 use crate::error::HttpError;
 use crate::manager::PlayerManager;
 use crate::Shared;
@@ -101,6 +102,10 @@ impl EventForwarder {
             },
             _ => return
         };
+
+        if let Err(e) = res {
+            error!("Error while forwarding voice event to server: {e:?}")
+        }
     }
 
     async fn server_update(
