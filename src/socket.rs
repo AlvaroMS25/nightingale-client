@@ -319,8 +319,14 @@ impl Socket {
             UpdateState::DisconnectGateway(d) => (d.guild_id, d.channel_id)
         };
 
-        self.players.get_or_insert_mut(guild.get())
-            .channel = channel;
+        if channel.is_none() {
+            self.players.players.remove(&guild.get());
+        } else {
+            self.players.get_or_insert(guild.get());
+        }
+
+        /*self.players.get_or_insert_mut(guild.get())
+            .channel = channel;*/
     }
 }
 

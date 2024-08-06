@@ -1,20 +1,14 @@
+use std::any::Any;
 use std::num::NonZeroU64;
+use std::sync::Arc;
 #[cfg(feature = "serenity")]
 use serenity::gateway::ShardRunnerMessage;
 #[cfg(feature = "serenity")]
 use futures::channel::mpsc::UnboundedSender as Sender;
-use futures::SinkExt;
-use serde_json::json;
-use tracing::info;
-#[cfg(feature = "twilight")]
-use twilight_gateway::MessageSender;
-use typemap_rev::TypeMap;
 use crate::error::HttpError;
-use crate::model::connection::PartialConnectionInfo;
 use crate::model::player::PlayerInfo;
 use crate::model::track::Track;
 use crate::rest::RestClient;
-use crate::shard::ShardWrapper;
 use crate::source::PlaySource;
 
 /// A player assigned to a guild.
@@ -24,36 +18,40 @@ pub struct Player {
     pub(crate) current: Option<Track>,
     paused: bool,
     volume: u16,
-    deaf: bool,
-    mute: bool,
-    data: TypeMap,
+    data: Option<Arc<dyn Any + Send + Sync + 'static>>,
     guild: NonZeroU64,
-    pub(crate) channel: Option<NonZeroU64>,
-    shard: ShardWrapper,
-    pub(crate) info: PartialConnectionInfo
 }
 
 impl Player {
-    pub(crate) fn new(http: RestClient, guild: NonZeroU64, shard: ShardWrapper) -> Self {
+    pub(crate) fn new(http: RestClient, guild: NonZeroU64) -> Self {
         Self {
             http,
             queue: Vec::new(),
             current: None,
-            data: TypeMap::new(),
+            data: None,
             guild,
-            channel: None,
             paused: false,
             volume: 100,
-            deaf: false,
-            mute: false,
-            shard,
-            info: Default::default()
+        }
+    }
+    pub(crate) fn new_with_data<T>(http: RestClient, guild: NonZeroU64, data: T) -> Self
+    where
+        T: Any + Send + Sync + 'static
+    {
+        Self {
+            http,
+            queue: Vec::new(),
+            current: None,
+            data: Some(Arc::new(data) as Arc<dyn Any + Send + Sync + 'static>),
+            guild,
+            paused: false,
+            volume: 100,
         }
     }
 
     /// Returns the inner type map held by the player.
-    pub fn data(&self) -> &TypeMap {
-        &self.data
+    pub fn data<T: Send + Sync + 'static>(&self) -> Option<&Arc<T>> {
+        self.data.as_ref().map(|d| d.downcast_ref()).flatten()
     }
 
     /// Returns the track that is currently being played, if someone.
@@ -124,77 +122,5 @@ impl Player {
                     r
                 })
         }
-    }
-
-    async fn update(&mut self, channel: Option<NonZeroU64>) {
-        let value = json!({
-            "op": 4,
-            "d": {
-                "channel_id": channel.map(|c| c.get()),
-                "guild_id": self.guild,
-                "self_deaf": self.deaf,
-                "self_mute": self.mute,
-            }
-        });
-
-        #[cfg(feature = "serenity")]
-        {
-            self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
-        }
-
-        #[cfg(feature = "twilight")]
-        {
-            self.shard.send(value.to_string()).await;
-        }
-    }
-
-    pub async fn set_deaf(&mut self, deaf: bool) {
-        self.deaf = deaf;
-        self.update(self.channel).await;
-    }
-
-    pub async fn set_mute(&mut self, mute: bool) {
-        self.mute = mute;
-        self.update(self.channel).await;
-    }
-
-    pub async fn connect_to(&mut self, channel: impl Into<NonZeroU64>) {
-        self.update(Some(channel.into())).await;
-    }
-
-    pub async fn disconnect(&mut self) -> Result<(), HttpError> {
-        self.http.update_player(self.guild, None).await?;
-
-        let value = json!({
-            "op": 4,
-            "d": {
-                "channel_id": null,
-                "guild_id": self.guild.get(),
-                "self_deaf": self.deaf,
-                "self_mute": self.mute,
-            }
-        });
-
-        #[cfg(feature = "serenity")]
-        {
-            self.shard.send(ShardRunnerMessage::Message(value.to_string().into())).await;
-        }
-
-        #[cfg(feature = "twilight")]
-        {
-            self.shard.send(value.to_string()).await;
-        }
-
-        Ok(())
-    }
-
-    pub(crate) async fn update_state(&mut self) -> Result<(), HttpError> {
-        if !self.info.complete() {
-            return Ok(())
-        }
-
-        let info = std::mem::take(&mut self.info).into_info();
-
-        self.http.update_player(self.guild, Some(info)).await
     }
 }

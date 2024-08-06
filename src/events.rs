@@ -82,7 +82,9 @@ impl EventForwarder {
     /// Forwards an event to the server. This call does not forward the full event to the server,
     /// instead it only uses the minimum required information by the server.
     pub async fn forward(&self, event: &TwilightEvent) {
-        let p = match event {
+        _ = event;
+        todo!()
+        /*let p = match event {
             TwilightEvent::VoiceServerUpdate(su) => {
                 self.server_update(
                     su.guild_id.get(),
@@ -99,24 +101,6 @@ impl EventForwarder {
                 ).await;
             },
             _ => return
-        };
-    }
-
-    async fn state_update(&self, guild: u64, channel_id: Option<NonZeroU64>, session_id: String) {
-        let mut p = self.players.get_or_insert_mut(guild);
-
-        p.info.channel_id = channel_id;
-        p.info.session_id = Some(session_id);
-
-        let _ = p.update_state().await;
-    }
-
-    async fn server_update(&self, guild: u64, endpoint: Option<String>, token: String) {
-        let mut p = self.players.get_or_insert_mut(guild);
-
-        p.info.endpoint = endpoint;
-        p.info.token = Some(token);
-
-        let _ = p.update_state().await;
+        };*/
     }
 }

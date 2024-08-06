@@ -14,7 +14,6 @@ pub mod serenity_ext;
 #[cfg(feature = "twilight")]
 pub mod stream;
 pub mod reference;
-mod shard;
 
 use std::num::NonZeroU64;
 use std::sync::Arc;
@@ -50,16 +49,15 @@ use futures::SinkExt;
 use serde_json::json;
 #[cfg(feature = "serenity")]
 use serenity::all::ShardRunnerMessage;
+use songbird::ConnectionInfo;
 use crate::config::SessionConfig;
 
 use crate::reference::{Reference, ReferenceMut};
-use crate::shard::ShardStorage;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,
     pub config: RwLock<Config>,
     pub session_config: RwLock<SessionConfig>,
-    pub shards: ShardStorage
 }
 
 /// Client that handles a single connection to a nightingale server.
@@ -98,19 +96,13 @@ impl NightingaleClient {
 
     #[cfg(feature = "twilight")]
     /// Creates a new instance to be used with twilight.
-    pub fn new_twilight<'a, I>(config: Config, shards: I) -> Self
-    where
-        I: IntoIterator<Item = &'a Shard>
-    {
+    pub fn new_twilight(config: Config) -> Self {
         assert!(config.user_id.is_some());
-        let map = shards.into_iter().map(|s| (s.id().number(), s.sender()))
-            .collect::<HashMap<_, _>>();
 
         let shared = Arc::new(Shared {
             session: RwLock::new(Uuid::nil()),
             config: RwLock::new(config),
             session_config: RwLock::new(SessionConfig::default()),
-            shards: ShardStorage::new(map)
         });
 
         let rest = RestClient::new(shared.clone());
@@ -190,46 +182,30 @@ impl NightingaleClient {
     }
 
     /// Joins the given voice channel.
-    pub async fn join<G, C>(&self, guild: G, channel: C)
-        -> Reference<Player>
-    where
-        G: Into<NonZeroU64>,
-        C: Into<NonZeroU64>
+    pub async fn join(
+        &self,
+        info: impl Into<ConnectionInfo>
+    ) -> Result<Reference<Player>, HttpError>
     {
-        let guild = guild.into();
+        let info = info.into();
+        let guild = info.guild_id.0;
 
-        let mut sender = self.shared.shards.for_guild(guild.get());
+        self.http.update_player(guild, Some(model::connection::ConnectionInfo {
+            channel_id: info.channel_id.map(|c| c.0),
+            endpoint: info.endpoint,
+            session_id: info.session_id,
+            token: info.token
+        })).await?;
 
-        let value = json!({
-            "op": 4,
-            "d": {
-                "channel_id": channel.into().get(),
-                "guild_id": guild.get(),
-                "self_deaf": false,
-                "self_mute": false,
-            }
-        });
-
-        #[cfg(feature = "serenity")]
-        {
-            sender.send(ShardRunnerMessage::Message(value.to_string().into())).await;
-        }
-
-        #[cfg(feature = "twilight")]
-        {
-            sender.send(value.to_string()).await;
-        }
-
-        self.players.get_or_insert(guild.get()).into()
+        Ok(self.players.get_or_insert(guild.get()).into())
     }
 
     /// Leaves the given voice channel.
-    pub async fn leave<G: Into<NonZeroU64>>(&self, guild: G)
-        -> Result<(), HttpError> {
+    pub async fn destroy_player<G: Into<NonZeroU64>>(&self, guild: G) -> Result<(), HttpError> {
         let guild = guild.into();
-        let Some((_, mut p)) = self.players.players.remove(&guild.get()) else { return Ok(()) };
-
-        p.disconnect().await
+        self.players.players.remove(&guild.get());
+        self.http.update_player(guild, None).await?;
+        Ok(())
     }
 
     /// Makes a search on the provided source.

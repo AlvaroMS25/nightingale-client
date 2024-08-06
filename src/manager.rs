@@ -25,8 +25,7 @@ impl PlayerManager {
         if self.players.contains_key(&guild) {
             self.players.get(&guild).unwrap()
         } else {
-            let shard = self.shared.shards.for_guild(guild);
-            let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap(), shard);
+            let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap());
             self.players.insert(guild, player);
             self.players.get(&guild).unwrap()
         }
@@ -36,8 +35,7 @@ impl PlayerManager {
         if self.players.contains_key(&guild) {
             self.players.get_mut(&guild).unwrap()
         } else {
-            let shard = self.shared.shards.for_guild(guild);
-            let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap(), shard);
+            let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap());
             self.players.insert(guild, player);
             self.players.get_mut(&guild).unwrap()
         }

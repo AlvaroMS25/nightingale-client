@@ -1,6 +1,5 @@
 use std::num::NonZeroU64;
 use serde::Deserialize;
-use crate::model::connection::PartialConnectionInfo;
 use crate::model::track::Track;
 
 /// Serializable player object returned from the player info route.
