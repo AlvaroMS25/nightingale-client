@@ -1,5 +1,6 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
+use dashmap::mapref::one::RefMut;
 use crate::model::gateway::ready::Ready;
 #[cfg(feature = "serenity")]
 use crate::model::gateway::event::{TrackEnd, TrackErrored};
@@ -7,7 +8,6 @@ use crate::model::gateway::event::{TrackEnd, TrackErrored};
 use crate::model::gateway::state::{ConnectionData, DisconnectData};
 #[cfg(feature = "serenity")]
 use crate::model::track::Track;
-#[cfg(feature = "serenity")]
 use crate::player::Player;
 #[cfg(feature = "serenity")]
 use serenity::async_trait;
@@ -21,6 +21,7 @@ use crate::msg::ToSocketMessage;
 use twilight_model::gateway::event::Event as TwilightEvent;
 #[cfg(feature = "twilight")]
 use serde_json::json;
+use crate::error::HttpError;
 use crate::manager::PlayerManager;
 use crate::Shared;
 
@@ -82,9 +83,7 @@ impl EventForwarder {
     /// Forwards an event to the server. This call does not forward the full event to the server,
     /// instead it only uses the minimum required information by the server.
     pub async fn forward(&self, event: &TwilightEvent) {
-        _ = event;
-        todo!()
-        /*let p = match event {
+        let res = match event {
             TwilightEvent::VoiceServerUpdate(su) => {
                 self.server_update(
                     su.guild_id.get(),
@@ -98,9 +97,47 @@ impl EventForwarder {
                     guild.get(),
                     su.channel_id.map(|c| c.into_nonzero()),
                     su.session_id.clone()
-                ).await;
+                ).await
             },
             _ => return
-        };*/
+        };
+    }
+
+    async fn server_update(
+        &self,
+        guild: u64,
+        endpoint: Option<String>,
+        token: String
+    ) -> Result<(), HttpError> {
+        let mut p = self.players.get_or_insert_mut(guild);
+
+        p.partial.endpoint = endpoint;
+        p.partial.token = Some(token);
+
+        self.update_if_needed(p).await
+    }
+
+    async fn state_update(
+        &self,
+        guild: u64,
+        channel: Option<NonZeroU64>,
+        session: String
+    ) -> Result<(), HttpError> {
+        let mut p = self.players.get_or_insert_mut(guild);
+
+        p.partial.channel_id = channel;
+        p.partial.session_id = Some(session);
+
+        self.update_if_needed(p).await
+    }
+
+    async fn update_if_needed(&self, mut player: RefMut<'_, u64, Player>) -> Result<(), HttpError> {
+        if player.partial.complete() {
+            let info = std::mem::take(&mut player.partial).into_info();
+
+            player.http.update_player(player.guild, Some(info)).await?;
+        }
+
+        Ok(())
     }
 }
