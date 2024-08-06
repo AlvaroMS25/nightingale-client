@@ -182,7 +182,7 @@ impl NightingaleClient {
     }
 
     /// Joins the given voice channel.
-    pub async fn join(
+    pub async fn create_player(
         &self,
         info: impl Into<ConnectionInfo>
     ) -> Result<Reference<Player>, HttpError>
