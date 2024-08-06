@@ -1,11 +1,8 @@
 use std::any::Any;
 use std::num::NonZeroU64;
 use std::sync::Arc;
-#[cfg(feature = "serenity")]
-use serenity::gateway::ShardRunnerMessage;
-#[cfg(feature = "serenity")]
-use futures::channel::mpsc::UnboundedSender as Sender;
 use crate::error::HttpError;
+use crate::model::connection::PartialConnectionInfo;
 use crate::model::player::PlayerInfo;
 use crate::model::track::Track;
 use crate::rest::RestClient;
@@ -13,13 +10,14 @@ use crate::source::PlaySource;
 
 /// A player assigned to a guild.
 pub struct Player {
-    http: RestClient,
+    pub(crate) http: RestClient,
     pub(crate) queue: Vec<Track>,
     pub(crate) current: Option<Track>,
-    paused: bool,
-    volume: u16,
-    data: Option<Arc<dyn Any + Send + Sync + 'static>>,
-    guild: NonZeroU64,
+    pub(crate) paused: bool,
+    pub(crate) volume: u16,
+    pub(crate) data: Option<Arc<dyn Any + Send + Sync + 'static>>,
+    pub(crate) guild: NonZeroU64,
+    pub(crate) partial: PartialConnectionInfo
 }
 
 impl Player {
@@ -32,6 +30,7 @@ impl Player {
             guild,
             paused: false,
             volume: 100,
+            partial: Default::default(),
         }
     }
     pub(crate) fn new_with_data<T>(http: RestClient, guild: NonZeroU64, data: T) -> Self
@@ -46,6 +45,7 @@ impl Player {
             guild,
             paused: false,
             volume: 100,
+            partial: Default::default(),
         }
     }
 
@@ -122,5 +122,13 @@ impl Player {
                     r
                 })
         }
+    }
+
+    pub fn volume(&self) -> u16 {
+        self.volume
+    }
+
+    pub fn paused(&self) -> bool {
+        self.paused
     }
 }
