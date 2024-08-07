@@ -70,7 +70,6 @@ impl NightingaleClient {
             session: RwLock::new(Uuid::nil()),
             config: RwLock::new(config),
             session_config: RwLock::new(SessionConfig::default()),
-            shards: ShardStorage::new(),
         });
         let rest = RestClient::new(shared.clone());
         let players = Arc::new(PlayerManager::new(rest.clone(), shared.clone()));

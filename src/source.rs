@@ -1,6 +1,7 @@
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use crate::model::search::deezer::{DeezerAlbum, DeezerPlaylist, DeezerTrack};
 use crate::model::search::youtube::{YoutubePlaylist, YoutubeTrack};
 use crate::model::track::Track;
 
@@ -18,6 +19,14 @@ pub trait SearchSource: SearchRoute {
     type Track: DeserializeOwned;
     /// The playlist returned from playlist calls.
     type Playlist: DeserializeOwned;
+}
+
+pub trait AlbumRoute {
+    fn album(album: String) -> String;
+}
+
+pub trait AlbumSource: AlbumRoute {
+    type Album: DeserializeOwned;
 }
 
 /// Youtube source.
@@ -110,4 +119,31 @@ impl PlaySource for Bytes {
             "data": self.0
         })
     }
+}
+
+pub struct Deezer;
+
+impl SearchRoute for Deezer {
+    fn track(query: String) -> String {
+        format!("/deezer/search?query={}", urlencoding::encode(&query))
+    }
+
+    fn playlist(playlist: String) -> String {
+        format!("/deezer/playlist?playlist={}", urlencoding::encode(&playlist))
+    }
+}
+
+impl AlbumRoute for Deezer {
+    fn album(album: String) -> String {
+        format!("/deezer/album?album={}", urlencoding::encode(&album))
+    }
+}
+
+impl SearchSource for Deezer {
+    type Track = DeezerTrack;
+    type Playlist = DeezerPlaylist;
+}
+
+impl AlbumSource for Deezer {
+    type Album = DeezerAlbum;
 }
