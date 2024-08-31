@@ -14,14 +14,13 @@ use socket::Socket;
 
 use crate::config::SessionConfig;
 use crate::error::HttpError;
-#[cfg(feature = "twilight")]
 use crate::events::EventForwarder;
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
 use crate::manager::PlayerManager;
 use crate::msg::{FromSocketMessage, ToSocketMessage};
 use crate::player::Player;
-use crate::reference::{Reference, ReferenceMut};
+use crate::reference::{Reference};
 use crate::rest::RestClient;
 #[cfg(feature = "serenity")]
 use crate::serenity_ext::NightingaleVoiceManager;
@@ -46,6 +45,7 @@ pub mod serenity_ext;
 #[cfg(feature = "twilight")]
 pub mod stream;
 pub mod reference;
+mod reflock;
 
 pub(crate) struct Shared {
     pub session: RwLock<Uuid>,
@@ -72,7 +72,7 @@ impl NightingaleClient {
             session_config: RwLock::new(SessionConfig::default()),
         });
         let rest = RestClient::new(shared.clone());
-        let players = Arc::new(PlayerManager::new(rest.clone(), shared.clone()));
+        let players = Arc::new(PlayerManager::new(rest.clone()));
 
         Self {
             socket: Socket::new(
@@ -98,7 +98,7 @@ impl NightingaleClient {
         });
 
         let rest = RestClient::new(shared.clone());
-        let players = Arc::new(PlayerManager::new(rest.clone(), shared.clone()));
+        let players = Arc::new(PlayerManager::new(rest.clone()));
 
         Self {
             socket: Socket::new(
@@ -164,7 +164,6 @@ impl NightingaleClient {
         EventStream::new(self.socket.events.clone())
     }
 
-    #[cfg(feature = "twilight")]
     /// Returns a forwarder that must be used to forward voice server update and voice state update
     /// events, this will only send the minimum required fields in the payload, not the whole event.
     pub fn events_forwarder(&self) -> EventForwarder {
@@ -177,10 +176,12 @@ impl NightingaleClient {
     pub async fn create_player(
         &self,
         info: impl Into<ConnectionInfo>
-    ) -> Result<Reference<Player>, HttpError>
+    ) -> Result<Arc<Player>, HttpError>
     {
         let info = info.into();
         let guild = info.guild_id.0;
+
+        tracing::info!("[Sending http request] Creating player");
 
         self.http.update_player(guild, Some(model::connection::ConnectionInfo {
             channel_id: info.channel_id.map(|c| c.0),
@@ -189,7 +190,14 @@ impl NightingaleClient {
             token: info.token
         })).await?;
 
-        Ok(self.players.get_or_insert(guild.get()).into())
+        tracing::info!("[Request sent] Player created on server");
+        tracing::info!("[Local player] Creating player on client");
+
+        let player = self.players.get_or_insert(guild.get()).into_owned();
+
+        tracing::info!("[Local player] Created player on client");
+
+        Ok(player)
     }
 
     /// Leaves the given voice channel.
@@ -217,14 +225,12 @@ impl NightingaleClient {
     }
 
     /// Returns a reference to the player of the provided guild, if present.
-    pub fn get_player(&self, guild: impl Into<NonZeroU64>) -> Option<Reference<Player>> {
-        self.players.players.get(&guild.into().get())
-            .map(Into::into)
+    pub fn get_player(&self, guild: impl Into<NonZeroU64>) -> Option<Arc<Player>> {
+        self.players.get(guild.into().get())
+            .map(Reference::into_owned)
     }
 
-    /// Returns a mutable reference to the player of the provided guild, if present.
-    pub fn get_player_mut(&self, guild: impl Into<NonZeroU64>) -> Option<ReferenceMut<Player>> {
-        self.players.players.get_mut(&guild.into().get())
-            .map(Into::into)
+    pub fn get_player_ref(&self, guild: impl Into<NonZeroU64>) -> Option<Reference<Player>> {
+        self.players.get(guild.into().get())
     }
 }

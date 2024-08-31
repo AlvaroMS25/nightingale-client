@@ -21,9 +21,13 @@ use crate::msg::ToSocketMessage;
 use twilight_model::gateway::event::Event as TwilightEvent;
 #[cfg(feature = "twilight")]
 use serde_json::json;
+#[cfg(feature = "serenity")]
+use serenity::all::{VoiceServerUpdateEvent, VoiceState};
 use tracing::error;
 use crate::error::HttpError;
 use crate::manager::PlayerManager;
+use crate::model::connection::PartialConnectionInfo;
+use crate::rest::RestClient;
 use crate::Shared;
 
 #[cfg(feature = "serenity")]
@@ -74,19 +78,19 @@ impl From<IncomingPayload> for IncomingEvent {
     }
 }
 
-#[cfg(feature = "twilight")]
+#[derive(Clone)]
 pub struct EventForwarder {
     pub(crate) players: Arc<PlayerManager>
 }
 
-#[cfg(feature = "twilight")]
 impl EventForwarder {
+    #[cfg(feature = "twilight")]
     /// Forwards an event to the server. This call does not forward the full event to the server,
     /// instead it only uses the minimum required information by the server.
     pub async fn forward(&self, event: &TwilightEvent) {
         let res = match event {
             TwilightEvent::VoiceServerUpdate(su) => {
-                self.server_update(
+                self._server_update(
                     su.guild_id.get(),
                     su.endpoint.clone(),
                     su.token.clone()
@@ -94,7 +98,7 @@ impl EventForwarder {
             },
             TwilightEvent::VoiceStateUpdate(su) => {
                 let Some(guild) = su.guild_id else { return; };
-                self.state_update(
+                self._state_update(
                     guild.get(),
                     su.channel_id.map(|c| c.into_nonzero()),
                     su.session_id.clone()
@@ -108,39 +112,68 @@ impl EventForwarder {
         }
     }
 
-    async fn server_update(
+    #[cfg(feature = "serenity")]
+    pub async fn voice_server_update(&self, event: VoiceServerUpdateEvent) -> Result<(), HttpError> {
+        if event.guild_id.is_none() {
+            return Ok(());
+        }
+
+        self._server_update(event.guild_id.unwrap().get(), event.endpoint, event.token).await
+    }
+
+    #[cfg(feature = "serenity")]
+    pub async fn voice_state_update(&self, vs: VoiceState) -> Result<(), HttpError> {
+        if vs.guild_id.is_none() {
+            return Ok(());
+        }
+
+        self._state_update(
+            vs.guild_id.unwrap().get(),
+            vs.channel_id.map(Into::into),
+            vs.session_id
+        ).await
+    }
+
+    async fn _server_update(
         &self,
         guild: u64,
         endpoint: Option<String>,
         token: String
     ) -> Result<(), HttpError> {
-        let mut p = self.players.get_or_insert_mut(guild);
+        let mut p = self.players.get_or_insert(guild);
+        let mut partial = p.partial.lock();
 
-        p.partial.endpoint = endpoint;
-        p.partial.token = Some(token);
+        partial.endpoint = endpoint;
+        partial.token = Some(token);
 
-        self.update_if_needed(p).await
+        self.update_if_needed(&p.http, p.guild, &mut partial).await
     }
 
-    async fn state_update(
+    async fn _state_update(
         &self,
         guild: u64,
         channel: Option<NonZeroU64>,
         session: String
     ) -> Result<(), HttpError> {
-        let mut p = self.players.get_or_insert_mut(guild);
+        let mut p = self.players.get_or_insert(guild);
+        let mut partial = p.partial.lock();
 
-        p.partial.channel_id = channel;
-        p.partial.session_id = Some(session);
+        partial.channel_id = channel;
+        partial.session_id = Some(session);
 
-        self.update_if_needed(p).await
+        self.update_if_needed(&p.http, p.guild, &mut partial).await
     }
 
-    async fn update_if_needed(&self, mut player: RefMut<'_, u64, Player>) -> Result<(), HttpError> {
-        if player.partial.complete() {
-            let info = std::mem::take(&mut player.partial).into_info();
+    async fn update_if_needed(
+        &self,
+        http: &RestClient,
+        guild: NonZeroU64,
+        partial: &mut PartialConnectionInfo
+    ) -> Result<(), HttpError> {
+        if partial.complete() {
+            let info = std::mem::take(partial).into_info();
 
-            player.http.update_player(player.guild, Some(info)).await?;
+            http.update_player(guild, Some(info)).await?;
         }
 
         Ok(())

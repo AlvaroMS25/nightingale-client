@@ -14,7 +14,7 @@ use crate::model::info::Info;
 use crate::model::player::PlayerInfo;
 use crate::model::track::Track;
 use crate::Shared;
-use crate::source::{PlaySource, SearchSource};
+use crate::source::{AlbumSource, PlaySource, SearchSource};
 
 #[derive(Clone)]
 pub struct RestClient {
@@ -71,6 +71,18 @@ impl RestClient {
         let _ = source;
         deserialize_json::<S::Playlist>(
             self.http.get(format!("{}/search{}", self.base_api_route(), S::playlist(playlist)))
+                .send()
+                .await?
+        ).await
+    }
+
+    pub async fn album<S>(&self, album: String, source: S) -> Result<S::Album, HttpError>
+    where
+        S: AlbumSource
+    {
+        let _ = source;
+        deserialize_json::<S::Album>(
+            self.http.get(format!("{}/search{}", self.base_api_route(), S::album(album)))
                 .send()
                 .await?
         ).await

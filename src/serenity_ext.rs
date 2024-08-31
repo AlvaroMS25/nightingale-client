@@ -56,35 +56,35 @@ pub(crate) struct NightingaleVoiceManager {
 
 #[async_trait]
 impl VoiceGatewayManager for NightingaleVoiceManager {
-    async fn initialise(&self, shard_count: u32, user_id: UserId) {
+    async fn initialise(&self, _: u32, user_id: UserId) {
         let mut cfg = self.shared.config.write();
 
         cfg.user_id = Some(user_id.into());
     }
 
-    async fn register_shard(&self, shard_id: u32, sender: UnboundedSender<ShardRunnerMessage>) {
-        self.shared.shards.shards.insert(shard_id as _, sender);
+    async fn register_shard(&self, _: u32, _: UnboundedSender<ShardRunnerMessage>) {
+        //self.shared.shards.shards.insert(shard_id as _, sender);
     }
 
-    async fn deregister_shard(&self, shard_id: u32) {
-        self.shared.shards.shards.remove(&(shard_id as _));
+    async fn deregister_shard(&self, _: u32) {
+        //self.shared.shards.shards.remove(&(shard_id as _));
     }
 
-    async fn server_update(&self, guild_id: GuildId, endpoint: &Option<String>, token: &str) {
-        let mut p = self.players.get_or_insert_mut(guild_id.get());
+    async fn server_update(&self, _: GuildId, _: &Option<String>, _: &str) {
+        /*let mut p = self.players.get_or_insert_mut(guild_id.get());
 
         p.info.endpoint = endpoint.clone();
         p.info.token = Some(token.to_string());
 
-        let _ = p.update_state().await;
+        let _ = p.update_state().await;*/
     }
 
-    async fn state_update(&self, guild_id: GuildId, voice_state: &VoiceState) {
-        let mut p = self.players.get_or_insert_mut(guild_id.get());
+    async fn state_update(&self, _: GuildId, _: &VoiceState) {
+        /*let mut p = self.players.get_or_insert_mut(guild_id.get());
 
         p.info.channel_id = voice_state.channel_id.map(Into::into);
         p.info.session_id = Some(voice_state.session_id.clone());
 
-        let _ = p.update_state().await;
+        let _ = p.update_state().await;*/
     }
 }

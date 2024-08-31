@@ -2,6 +2,7 @@ use std::{pin::Pin, task::{Context, Poll}};
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::future::Future;
+use std::num::NonZeroU64;
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
 use tokio::net::TcpStream;
@@ -21,7 +22,6 @@ use crate::msg::{FromSocketMessage, ToSocketMessage};
 
 #[cfg(feature = "serenity")]
 use crate::events::EventHandler;
-#[cfg(feature = "serenity")]
 use crate::model::gateway::event::Event;
 #[cfg(feature = "serenity")]
 use serenity::gateway::ShardRunnerMessage;
@@ -32,6 +32,7 @@ use tokio_tungstenite::tungstenite::http::HeaderValue;
 use twilight_gateway::MessageSender;
 #[cfg(feature = "twilight")]
 use crate::events::IncomingEvent;
+use crate::player::Player;
 
 pub struct SocketHandle {
     pub sender: UnboundedSender<ToSocketMessage>,
@@ -262,11 +263,10 @@ impl Socket {
                 }
             },
             IncomingPayload::Event { guild_id, event } => {
-                let players = Arc::clone(&self.players);
+                let player = self.players.get_or_insert(guild_id).into_owned();
+                self.process_track_event(&player, &event);
 
                 tokio::spawn(async move {
-                    let player = players.get_or_insert(guild_id);
-
                     match event {
                         Event::TrackStart(t) => events.on_track_start(&*player, t).await,
                         Event::TrackEnd(t) => events.on_track_end(&*player, t).await,
@@ -285,6 +285,12 @@ impl Socket {
 
                 IncomingEvent::Ready(r)
             },
+            IncomingPayload::Event { guild_id, event } => {
+                let player = self.players.get_or_insert(guild_id).into_owned();
+                self.process_track_event(&player, &event);
+
+                IncomingPayload::Event {guild_id, event}.into()
+            },
             other => {
                 if let IncomingPayload::UpdateState(s) = &other {
                     self.update_player(s);
@@ -295,6 +301,24 @@ impl Socket {
         };
 
         let _ = self.events.send(p).unwrap();
+    }
+
+    fn process_track_event(&mut self, player: &Player, ev: &Event) {
+        match ev {
+            Event::TrackStart(t) => {
+                let mut queue = player.queue.write();
+                if let Some(first) = queue.front() {
+                    if first.source_url == t.source_url {
+                        queue.pop_front();
+                    }
+                }
+
+                *player.current.write() = Some(t.clone());
+            },
+            Event::TrackEnd(_) | Event::TrackErrored(_) => {
+                *player.current.write() = None;
+            },
+        }
     }
 
     async fn connect(&mut self, url: &str) -> Result<(), Error>{

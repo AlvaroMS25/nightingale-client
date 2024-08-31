@@ -3,41 +3,34 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use dashmap::mapref::one::{Ref, RefMut};
 use crate::player::Player;
+use crate::reference::{Reference};
 use crate::rest::RestClient;
 use crate::Shared;
 
 pub(crate) struct PlayerManager {
     http: RestClient,
-    shared: Arc<Shared>,
-    pub(crate) players: DashMap<u64, Player>
+    pub(crate) players: DashMap<u64, Arc<Player>>
 }
 
 impl PlayerManager {
-    pub fn new(http: RestClient, shared: Arc<Shared>) -> Self {
+    pub fn new(http: RestClient) -> Self {
         Self {
             http,
-            shared,
             players: DashMap::new()
         }
     }
 
-    pub fn get_or_insert(&self, guild: u64) -> Ref<u64, Player> {
+    pub fn get_or_insert(&self, guild: u64) -> Reference<Player> {
         if self.players.contains_key(&guild) {
-            self.players.get(&guild).unwrap()
+            self.players.get(&guild).unwrap().into()
         } else {
             let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap());
-            self.players.insert(guild, player);
-            self.players.get(&guild).unwrap()
+            self.players.insert(guild, Arc::new(player));
+            self.players.get(&guild).unwrap().into()
         }
     }
 
-    pub fn get_or_insert_mut(&self, guild: u64) -> RefMut<u64, Player> {
-        if self.players.contains_key(&guild) {
-            self.players.get_mut(&guild).unwrap()
-        } else {
-            let player = Player::new(self.http.clone(), NonZeroU64::new(guild).unwrap());
-            self.players.insert(guild, player);
-            self.players.get_mut(&guild).unwrap()
-        }
+    pub fn get(&self, guild: u64) -> Option<Reference<Player>> {
+        self.players.get(&guild).map(|player| player.into())
     }
 }
