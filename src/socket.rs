@@ -226,6 +226,19 @@ impl Socket {
                     error!("Disconnected from server, error: {e}");
                     self.stream = None;
                     self.sender_send(FromSocketMessage::Disconnected);
+                    // notify the event handler
+                    
+                    #[cfg(feature = "twilight")]
+                    {
+                        self.events.send(IncomingEvent::DisconnectedFromServer(e)).unwrap();
+                    }
+                    #[cfg(feature = "serenity")]
+                    {
+                        let events = Arc::clone(&self.events);
+                        tokio::spawn(async move {
+                            events.on_server_disconnect(e).await;
+                        });
+                    }
                 }
             }
         }

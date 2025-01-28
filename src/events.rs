@@ -49,6 +49,8 @@ pub trait EventHandler: Send + Sync {
     async fn on_track_end(&self, _player: &Player, _track_end: TrackEnd) {}
     /// Triggered when a track encountered an error when trying to play.
     async fn on_track_errored(&self, _player: &Player, _track_errored: TrackErrored) {}
+    /// Triggered when the client disconnects from the voice server.
+    async fn on_server_disconnect(&self, error: tokio_tungstenite::tungstenite::Error) {}
 }
 
 #[cfg(feature = "twilight")]
@@ -64,7 +66,9 @@ pub enum IncomingEvent {
         guild_id: u64,
         /// The event itself.
         event: Event
-    }
+    },
+    /// Received when the socket disconnects from the server.
+    DisconnectedFromServer(tokio_tungstenite::tungstenite::Error),
 }
 
 #[cfg(feature = "twilight")]
