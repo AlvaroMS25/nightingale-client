@@ -122,6 +122,16 @@ impl Player {
         }
     }
 
+    pub async fn skip(&self) -> Result<Option<Track>, HttpError> {
+        if self.queue().is_empty() {
+            return Ok(None);
+        }
+
+        self.queue.write().pop_front();
+        self.http.player_skip(self.guild).await
+            .map(Some)
+    }
+
     /// Sets a new volume, the default value is 100.
     pub async fn set_volume(&self, volume: u16) -> Result<(), HttpError> {
         if self.volume() == volume {

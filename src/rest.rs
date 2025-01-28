@@ -212,6 +212,13 @@ impl RestClient {
         }
     }
 
+    pub(crate) async fn player_skip(&self, guild: NonZeroU64) -> Result<Track, HttpError> {
+        let session = self.session();
+        let url = format!("{}/{session}/players/{guild}/queue/skip", self.base_api_route());
+
+        deserialize_json(self.http.patch(url).send().await?).await
+    }
+
 }
 
 async fn deserialize_json<M: DeserializeOwned>(response: Response) -> Result<M, HttpError> {
