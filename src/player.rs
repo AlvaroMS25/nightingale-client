@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use crate::error::HttpError;
 use crate::model::connection::PartialConnectionInfo;
 use crate::model::player::PlayerInfo;
@@ -19,7 +19,7 @@ pub struct Player {
     pub(crate) current: RefLock<Option<Track>>,
     pub(crate) paused: AtomicBool,
     pub(crate) volume: AtomicU16,
-    pub(crate) data: Option<Arc<dyn Any + Send + Sync + 'static>>,
+    pub(crate) data: RefLock<Option<Arc<dyn Any + Send + Sync + 'static>>>,
     pub(crate) guild: NonZeroU64,
     pub(crate) partial: Mutex<PartialConnectionInfo>
 }
@@ -30,22 +30,7 @@ impl Player {
             http,
             queue: Default::default(),
             current: Default::default(),
-            data: None,
-            guild,
-            paused: AtomicBool::new(false),
-            volume: AtomicU16::new(100),
-            partial: Default::default(),
-        }
-    }
-    pub(crate) fn new_with_data<T>(http: RestClient, guild: NonZeroU64, data: T) -> Self
-    where
-        T: Any + Send + Sync + 'static
-    {
-        Self {
-            http,
-            queue: Default::default(),
-            current: Default::default(),
-            data: Some(Arc::new(data) as Arc<dyn Any + Send + Sync + 'static>),
+            data: Default::default(),
             guild,
             paused: AtomicBool::new(false),
             volume: AtomicU16::new(100),
@@ -54,8 +39,16 @@ impl Player {
     }
 
     /// Returns the inner type map held by the player.
-    pub fn data<T: Send + Sync + 'static>(&self) -> Option<&Arc<T>> {
-        self.data.as_ref().map(|d| d.downcast_ref()).flatten()
+    pub fn data<T: Send + Sync + 'static>(&self) -> Option<Arc<T>> {
+        self.data.read()
+            .as_ref()
+            .map(|d| d.clone().downcast().ok())
+            .flatten()
+            .clone()
+    }
+
+    pub fn set_data<T: Send + Sync + 'static>(&self, data: T) {
+        *self.data.write() = Some(Arc::new(data) as Arc<_>);
     }
 
     /// Returns the track that is currently being played, if someone.
