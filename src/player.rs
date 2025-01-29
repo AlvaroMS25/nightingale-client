@@ -116,11 +116,11 @@ impl Player {
     }
 
     pub async fn skip(&self) -> Result<Option<Track>, HttpError> {
-        if self.queue().is_empty() {
+        if self.current().is_none() && self.queue().is_empty() {
             return Ok(None);
         }
 
-        self.queue.write().pop_front();
+        //self.queue.write().pop_front();
         self.http.player_skip(self.guild).await
             .map(Some)
     }
